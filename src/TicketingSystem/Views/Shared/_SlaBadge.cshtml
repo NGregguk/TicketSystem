@@ -1,0 +1,20 @@
+@using Microsoft.Extensions.Options
+@model Ticket
+@inject IOptions<TicketingSystem.Options.SlaOptions> SlaOptions
+@{
+    var slaState = SlaHelper.GetSlaState(Model.CreatedAtUtc, Model.Priority, SlaOptions.Value);
+    var cssClass = slaState switch
+    {
+        SlaState.Overdue => "sla-overdue",
+        SlaState.DueSoon => "sla-duesoon",
+        _ => "sla-ontrack"
+    };
+    var label = slaState switch
+    {
+        SlaState.Overdue => "Overdue",
+        SlaState.DueSoon => "Due Soon",
+        _ => "On Track"
+    };
+}
+
+<span class="badge badge-sla @cssClass">@label</span>

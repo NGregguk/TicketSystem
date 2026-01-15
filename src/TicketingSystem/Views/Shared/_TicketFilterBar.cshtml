@@ -37,6 +37,14 @@
                     }
                 </select>
             </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">SLA</label>
+                <select class="form-select" name="sla">
+                    <option value="">All</option>
+                    <option value="due" selected="@(Model.Sla == "due")">Due Soon</option>
+                    <option value="overdue" selected="@(Model.Sla == "overdue")">Overdue</option>
+                </select>
+            </div>
             @if (User.IsInRole(RoleNames.Admin))
             {
                 <div class="col-lg-2 col-md-4">

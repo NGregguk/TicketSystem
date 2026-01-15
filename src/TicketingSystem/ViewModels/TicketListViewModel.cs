@@ -16,6 +16,7 @@ public class TicketListViewModel
     public TicketPriority? Priority { get; set; }
     public string? AssignedAdminUserId { get; set; }
     public string? Search { get; set; }
+    public string? Sla { get; set; }
 
     public int Page { get; set; }
     public int TotalPages { get; set; }

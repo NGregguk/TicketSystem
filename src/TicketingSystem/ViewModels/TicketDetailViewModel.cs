@@ -16,7 +16,9 @@ public class TicketDetailViewModel
 
     public string? AssignToUserId { get; set; }
     public TicketStatus? NewStatus { get; set; }
+    public TicketPriority? NewPriority { get; set; }
 
     public IEnumerable<SelectListItem> Admins { get; set; } = Array.Empty<SelectListItem>();
     public IEnumerable<SelectListItem> Statuses { get; set; } = Array.Empty<SelectListItem>();
+    public IEnumerable<SelectListItem> Priorities { get; set; } = Array.Empty<SelectListItem>();
 }

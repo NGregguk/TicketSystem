@@ -27,6 +27,31 @@
     }
 </div>
 
+<div class="row g-3 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <a class="card sla-summary-card" asp-controller="Tickets" asp-action="Index" asp-route-sla="due">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="sla-summary-label">Due Soon</div>
+                    <div class="sla-summary-count">@Model.DueSoonCount</div>
+                </div>
+                <span class="badge badge-sla sla-duesoon">Due Soon</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <a class="card sla-summary-card" asp-controller="Tickets" asp-action="Index" asp-route-sla="overdue">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="sla-summary-label">Overdue</div>
+                    <div class="sla-summary-count">@Model.OverdueCount</div>
+                </div>
+                <span class="badge badge-sla sla-overdue">Overdue</span>
+            </div>
+        </a>
+    </div>
+</div>
+
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="card h-100">
@@ -50,7 +75,7 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                    <div class="ticket-meta">@ticket.Category?.Name</div>
+                                    <div class="ticket-meta">@ticket.Category?.Name • Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
                                 </div>
                                 @await Html.PartialAsync("_BadgeStatus", ticket.Status)
                             </li>
@@ -83,7 +108,7 @@
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                        <div class="ticket-meta">@ticket.Category?.Name</div>
+                                    <div class="ticket-meta">@ticket.Category?.Name • Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
                                     </div>
                                     @await Html.PartialAsync("_BadgeStatus", ticket.Status)
                                 </li>
@@ -117,6 +142,8 @@
                                         <th>Status</th>
                                         <th>Priority</th>
                                         <th>Category</th>
+                                        <th>Age</th>
+                                        <th>SLA</th>
                                         <th>Updated</th>
                                     </tr>
                                 </thead>
@@ -129,6 +156,8 @@
                                             <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
                                             <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
                                             <td>@ticket.Category?.Name</td>
+                                            <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
+                                            <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
                                             <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
                                         </tr>
                                     }

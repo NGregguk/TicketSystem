@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TicketingSystem.Data;
+using TicketingSystem.Helpers;
 using TicketingSystem.Models;
+using TicketingSystem.Options;
 using TicketingSystem.Services;
 using TicketingSystem.ViewModels;
 
@@ -19,19 +22,22 @@ public class TicketsController : Controller
     private readonly IEmailSender _emailSender;
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<TicketsController> _logger;
+    private readonly SlaOptions _slaOptions;
 
     public TicketsController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IEmailSender emailSender,
         IFileStorage fileStorage,
-        ILogger<TicketsController> logger)
+        ILogger<TicketsController> logger,
+        IOptions<SlaOptions> slaOptions)
     {
         _db = db;
         _userManager = userManager;
         _emailSender = emailSender;
         _fileStorage = fileStorage;
         _logger = logger;
+        _slaOptions = slaOptions.Value;
     }
 
     public async Task<IActionResult> Index(
@@ -40,6 +46,7 @@ public class TicketsController : Controller
         TicketPriority? priority,
         string? assignedAdminUserId,
         string? search,
+        string? sla,
         int page = 1)
     {
         var query = _db.Tickets
@@ -86,6 +93,28 @@ public class TicketsController : Controller
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(sla))
+        {
+            var slaCandidates = await query
+                .Select(t => new { t.Id, t.CreatedAtUtc, t.Priority, t.Status })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var matchingIds = slaCandidates
+                .Where(t => t.Status != TicketStatus.Closed)
+                .Where(t =>
+                {
+                    var state = SlaHelper.GetSlaState(t.CreatedAtUtc, t.Priority, _slaOptions);
+                    return sla.Equals("due", StringComparison.OrdinalIgnoreCase)
+                        ? state == SlaState.DueSoon
+                        : sla.Equals("overdue", StringComparison.OrdinalIgnoreCase) && state == SlaState.Overdue;
+                })
+                .Select(t => t.Id)
+                .ToList();
+
+            query = query.Where(t => matchingIds.Contains(t.Id));
+        }
+
         var totalCount = await query.CountAsync();
         var totalPages = (int)Math.Ceiling(totalCount / (double)PageSize);
         if (page < 1) page = 1;
@@ -116,6 +145,7 @@ public class TicketsController : Controller
             Priority = priority,
             AssignedAdminUserId = assignedAdminUserId,
             Search = search,
+            Sla = sla,
             Page = page,
             TotalPages = totalPages
         };
@@ -243,7 +273,8 @@ public class TicketsController : Controller
             InternalNotes = ticket.InternalNotes.OrderByDescending(n => n.CreatedAtUtc).ToList(),
             Attachments = ticket.Attachments.OrderByDescending(a => a.UploadedAtUtc).ToList(),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
-            Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status))
+            Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status)),
+            Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString(), p == ticket.Priority))
         };
 
         return View(viewModel);
@@ -418,6 +449,32 @@ public class TicketsController : Controller
         _logger.LogInformation("Ticket {TicketId} status changed from {OldStatus} to {NewStatus}", ticket.Id, oldStatus, ticket.Status);
         await _emailSender.SendTicketStatusChangedAsync(ticket, oldStatus, ticket.Status);
         TempData["Success"] = "Status updated.";
+
+        return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePriority(int id, TicketDetailViewModel model)
+    {
+        if (!model.NewPriority.HasValue)
+        {
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var ticket = await _db.Tickets.FindAsync(id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        ticket.Priority = model.NewPriority.Value;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Ticket {TicketId} priority changed to {Priority}", ticket.Id, ticket.Priority);
+        TempData["Success"] = "Priority updated.";
 
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }

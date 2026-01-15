@@ -42,6 +42,7 @@ builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOpt
 builder.Services.Configure<UploadOptions>(builder.Configuration.GetSection(UploadOptions.SectionName));
 builder.Services.Configure<NotificationOptions>(builder.Configuration.GetSection(NotificationOptions.SectionName));
 builder.Services.Configure<SeedUserOptions>(builder.Configuration.GetSection(SeedUserOptions.SectionName));
+builder.Services.Configure<SlaOptions>(builder.Configuration.GetSection(SlaOptions.SectionName));
 
 var maxUploadSize = builder.Configuration.GetValue<long>("Uploads:MaxSizeBytes", 10 * 1024 * 1024);
 builder.Services.Configure<FormOptions>(options =>

@@ -143,9 +143,43 @@ body {
   margin-top: 0.5rem;
 }
 
+.sla-summary-card {
+  border-left: 4px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.sla-summary-card,
+.sla-summary-card:hover,
+.sla-summary-card:focus,
+.sla-summary-card:active {
+  text-decoration: none !important;
+  color: inherit;
+}
+
+.sla-summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.sla-summary-count {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
 .badge-status,
 .badge-priority {
   font-size: 0.72rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-sla {
+  font-size: 0.7rem;
   padding: 0.35rem 0.6rem;
   border-radius: 999px;
   font-weight: 600;
@@ -200,6 +234,21 @@ body {
 .priority-critical {
   background: #7f1d1d;
   color: #fff;
+}
+
+.sla-ontrack {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.sla-duesoon {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.sla-overdue {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .badge-soft {
@@ -396,35 +445,90 @@ body {
 }
 
 body.dark-mode {
-  --surface: #0b1220;
-  --surface-strong: #111827;
-  --border: #1f2937;
-  --text: #e5e7eb;
-  --muted: #9ca3af;
+  --surface: #151719;
+  --surface-strong: #1d1f22;
+  --border: #2a2d31;
+  --text: #e6e7e9;
+  --muted: #a1a4aa;
   --shadow-sm: 0 10px 20px rgba(0, 0, 0, 0.35);
-  background: radial-gradient(circle at top left, #0b1220 0%, #0f172a 45%, #0b1220 100%);
+  background: radial-gradient(circle at top left, #17191c 0%, #111315 45%, #17191c 100%);
   color: var(--text);
 }
 
-body.dark-mode .card {
-  background: var(--surface-strong);
+body.dark-mode a {
+  color: #e6e7e9;
 }
 
-body.dark-mode .table thead {
-  background: #111827;
+body.dark-mode a:hover {
+  color: #f5f6f7;
 }
 
-body.dark-mode .table tbody tr:hover {
-  background: #0f172a;
-}
-
-body.dark-mode .comment-card,
-body.dark-mode .opening-post {
-  background: #0f172a;
+body.dark-mode .card,
+body.dark-mode .page-header,
+body.dark-mode .opening-post,
+body.dark-mode .comment-card {
+  background: #1a1d21;
+  color: var(--text);
 }
 
 body.dark-mode .reply-card {
-  background: #0b1220;
+  background: #151719;
+  color: var(--text);
+}
+
+body.dark-mode .card-header,
+body.dark-mode .section-title,
+body.dark-mode .page-title {
+  color: var(--text);
+}
+
+body.dark-mode .page-actions a:not(.btn) {
+  color: var(--text);
+}
+
+body.dark-mode .page-subtitle,
+body.dark-mode .ticket-meta,
+body.dark-mode .text-muted,
+body.dark-mode .form-text {
+  color: var(--muted) !important;
+}
+
+body.dark-mode .info-label,
+body.dark-mode .conversation-label {
+  color: var(--muted);
+}
+
+body.dark-mode .form-label,
+body.dark-mode label {
+  color: var(--text);
+}
+
+body.dark-mode .list-group-item {
+  background: #1a1d21;
+  color: var(--text);
+  border-color: #2a2d31;
+}
+
+body.dark-mode .table {
+  color: var(--text);
+}
+
+body.dark-mode .table thead,
+body.dark-mode .table thead th {
+  background: #202327;
+  color: var(--text);
+  border-color: #2a2d31;
+}
+
+body.dark-mode .table tbody td,
+body.dark-mode .table tbody th {
+  background: #1a1d21;
+  color: var(--text);
+  border-color: #2a2d31;
+}
+
+body.dark-mode .table tbody tr:hover {
+  background: #1a1d21;
 }
 
 body.dark-mode .navbar .nav-link,
@@ -432,15 +536,11 @@ body.dark-mode .navbar .navbar-brand {
   color: #f8fafc;
 }
 
-body.dark-mode .page-header {
-  background: #0f172a;
-}
-
 body.dark-mode .form-control,
 body.dark-mode .form-select {
-  background: #0f172a;
-  color: #e5e7eb;
-  border-color: #1f2937;
+  background: #1a1d21;
+  color: #e6e7e9;
+  border-color: #2a2d31;
 }
 
 body.dark-mode .form-control::placeholder {
@@ -448,8 +548,21 @@ body.dark-mode .form-control::placeholder {
 }
 
 body.dark-mode .badge-muted {
-  background: #1f2937;
+  background: #2a2d31;
   color: #9ca3af;
+}
+
+body.dark-mode .badge-status,
+body.dark-mode .badge-priority {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .badge-sla {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .app-navbar {
+  background: linear-gradient(120deg, #1a1d20, #0f1113);
 }
 
 @media (max-width: 992px) {

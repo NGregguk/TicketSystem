@@ -8,4 +8,6 @@ public class DashboardViewModel
     public IReadOnlyList<Ticket> MyOpenTickets { get; set; } = Array.Empty<Ticket>();
     public IReadOnlyList<Ticket> UnassignedTickets { get; set; } = Array.Empty<Ticket>();
     public IReadOnlyList<Ticket> NeedsAttentionTickets { get; set; } = Array.Empty<Ticket>();
+    public int DueSoonCount { get; set; }
+    public int OverdueCount { get; set; }
 }

@@ -2,8 +2,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TicketingSystem.Data;
+using TicketingSystem.Helpers;
 using TicketingSystem.Models;
+using TicketingSystem.Options;
 using TicketingSystem.ViewModels;
 
 namespace TicketingSystem.Controllers;
@@ -13,11 +16,13 @@ public class HomeController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SlaOptions _slaOptions;
 
-    public HomeController(ApplicationDbContext db, UserManager<ApplicationUser> userManager)
+    public HomeController(ApplicationDbContext db, UserManager<ApplicationUser> userManager, IOptions<SlaOptions> slaOptions)
     {
         _db = db;
         _userManager = userManager;
+        _slaOptions = slaOptions.Value;
     }
 
     public async Task<IActionResult> Index()
@@ -35,6 +40,27 @@ public class HomeController : Controller
             .OrderByDescending(t => t.CreatedAtUtc)
             .Take(5)
             .ToListAsync();
+
+        var slaCandidates = await _db.Tickets
+            .AsNoTracking()
+            .Where(t => t.Status != TicketStatus.Closed)
+            .Select(t => new { t.CreatedAtUtc, t.Priority })
+            .ToListAsync();
+
+        var dueSoonCount = 0;
+        var overdueCount = 0;
+        foreach (var ticket in slaCandidates)
+        {
+            var slaState = SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions);
+            if (slaState == SlaState.Overdue)
+            {
+                overdueCount++;
+            }
+            else if (slaState == SlaState.DueSoon)
+            {
+                dueSoonCount++;
+            }
+        }
 
         var unassignedTickets = new List<Ticket>();
         var needsAttention = new List<Ticket>();
@@ -63,7 +89,9 @@ public class HomeController : Controller
             StatusCounts = statusCounts,
             MyOpenTickets = myOpenTickets,
             UnassignedTickets = unassignedTickets,
-            NeedsAttentionTickets = needsAttention
+            NeedsAttentionTickets = needsAttention,
+            DueSoonCount = dueSoonCount,
+            OverdueCount = overdueCount
         };
 
         return View(viewModel);
