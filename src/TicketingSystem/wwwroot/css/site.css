@@ -1,0 +1,384 @@
+﻿:root {
+  --brand: #1f4d6b;
+  --brand-dark: #0f2a3a;
+  --accent: #f59e0b;
+  --surface: #f4f7fb;
+  --surface-strong: #ffffff;
+  --border: #d9dee6;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+  --shadow-sm: 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+
+body {
+  font-family: "Space Grotesk", "Segoe UI", Tahoma, sans-serif;
+  background: radial-gradient(circle at top left, #eef2f7 0%, #f7f9fc 45%, #f1f5f9 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app-navbar {
+  background: linear-gradient(120deg, #103247, #0b1f2b);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.18);
+}
+
+.app-navbar .navbar-brand {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f8fafc !important;
+}
+
+.brand-mark {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.app-navbar .nav-link {
+  color: #f8fafc !important;
+  font-weight: 500;
+}
+
+.app-navbar .nav-link:hover,
+.app-navbar .nav-link:focus {
+  color: var(--accent) !important;
+}
+
+.app-navbar .navbar-toggler {
+  border-color: rgba(248, 250, 252, 0.4);
+}
+
+.app-navbar .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+.user-chip {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.page-subtitle {
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.page-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.page-actions a:not(.btn) {
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
+.page-actions .btn {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+  border-radius: 16px;
+}
+
+.card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.section-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status-card {
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(15, 23, 42, 0.12);
+}
+
+.status-card-title {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.status-card-count {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.badge-status,
+.badge-priority {
+  font-size: 0.72rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status-open {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-inprogress {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.status-waiting {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.status-resolved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-closed {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.priority-none {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.priority-low {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.priority-medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.priority-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.priority-critical {
+  background: #7f1d1d;
+  color: #fff;
+}
+
+.badge-soft {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.badge-muted {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.table thead {
+  background: #f1f5f9;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.ticket-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.filter-card {
+  border-left: 4px solid var(--accent);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.25rem;
+}
+
+.comment-timeline {
+  display: grid;
+  gap: 1rem;
+}
+
+.comment-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.note-card {
+  border-left: 4px solid var(--brand);
+}
+
+.note-card-item {
+  background: #eef2f7;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.comment-body {
+  font-size: 0.95rem;
+}
+
+.opening-post {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.conversation-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.conversation-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.conversation-body {
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.reply-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.reply-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #ffffff;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--muted);
+}
+
+.empty-state-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-state-message {
+  margin-top: 0.35rem;
+}
+
+.btn {
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+}
+
+.btn-loading {
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.form-control,
+.form-select {
+  border-radius: 10px;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem rgba(245, 158, 11, 0.2);
+}
+
+.footer {
+  color: var(--muted);
+}
+
+@media (max-width: 992px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .table tbody tr {
+    cursor: default;
+  }
+}

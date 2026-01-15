@@ -1,0 +1,288 @@
+﻿@model TicketDetailViewModel
+@{
+    ViewData["Title"] = $"Ticket #{Model.Ticket.Id}";
+    var header = new PageHeaderViewModel
+    {
+        Title = $"#{Model.Ticket.Id} {Model.Ticket.Title}",
+        Subtitle = $"Requester: {Model.Ticket.RequesterUser?.Email} | Category: {Model.Ticket.Category?.Name}",
+        Actions = @<div class="d-flex flex-wrap gap-2 align-items-center">
+            @await Html.PartialAsync("_BadgeStatus", Model.Ticket.Status)
+            @await Html.PartialAsync("_BadgePriority", Model.Ticket.Priority)
+            @if (Model.Ticket.Status != TicketStatus.Closed)
+            {
+                <form asp-action="Close" method="post" data-disable-on-submit>
+                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                    <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." onclick="return confirm('Close this ticket?');">Close</button>
+                </form>
+            }
+        </div>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header section-title">Conversation</div>
+            <div class="card-body">
+                <div class="opening-post">
+                    <div class="conversation-header">
+                        <div>
+                            <div class="conversation-label">Opening Post</div>
+                            <div class="fw-semibold">@Model.Ticket.RequesterUser?.Email</div>
+                        </div>
+                        <div class="ticket-meta">@Model.Ticket.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                    </div>
+                    <div class="conversation-body">@Model.Ticket.Description</div>
+                </div>
+
+                <div class="reply-list" id="comment-thread">
+                    @if (!Model.Comments.Any())
+                    {
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                        {
+                            Title = "No replies yet",
+                            Message = "Add the first reply to move this ticket forward."
+                        })
+                    }
+                    else
+                    {
+                        @foreach (var comment in Model.Comments)
+                        {
+                            <div class="reply-card">
+                                <div class="conversation-header">
+                                    <div class="fw-semibold">@comment.AuthorUser?.Email</div>
+                                    <div class="ticket-meta">@comment.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                                </div>
+                                <div class="conversation-body">@comment.Body</div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <form asp-action="AddComment" method="post" class="mt-3" data-disable-on-submit>
+                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                    <div class="mb-3">
+                        <label class="form-label">Add Reply</label>
+                        <textarea class="form-control" name="NewComment" rows="4" placeholder="Share updates or ask for details" required></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" type="submit" data-loading-text="Posting...">Post Reply</button>
+                        <button class="btn btn-outline-secondary" type="reset">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header section-title">Attachments</div>
+            <div class="card-body">
+                @if (!Model.Attachments.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = "No attachments",
+                        Message = "Upload a file if it helps explain the issue."
+                    })
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush mb-3">
+                        @foreach (var attachment in Model.Attachments)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-semibold">@attachment.OriginalFileName</div>
+                                    <div class="ticket-meta">Uploaded by @attachment.UploadedByUser?.Email on @attachment.UploadedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                                </div>
+                                <span class="text-muted">@string.Format("{0:N0} KB", attachment.SizeBytes / 1024)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                <form asp-action="UploadAttachment" method="post" enctype="multipart/form-data" data-disable-on-submit>
+                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                    <div class="mb-3">
+                        <label class="form-label">Upload Attachment</label>
+                        <input type="file" name="attachment" class="form-control" />
+                        <div class="form-text">Allowed: pdf, png, jpg, txt, docx, xlsx (max 10MB).</div>
+                    </div>
+                    <button class="btn btn-outline-primary" type="submit" data-loading-text="Uploading...">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        @if (User.IsInRole(RoleNames.Admin))
+        {
+            <div class="card mb-4">
+                <div class="card-header section-title">Admin Actions</div>
+                <div class="card-body">
+                    <form asp-action="Assign" method="post" class="mb-3" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <label class="form-label">Assign Ticket</label>
+                        <select class="form-select" name="AssignToUserId">
+                            <option value="">Unassigned</option>
+                            @foreach (var admin in Model.Admins)
+                            {
+                                <option value="@admin.Value" selected="@(admin.Value == Model.Ticket.AssignedAdminUserId)">@admin.Text</option>
+                            }
+                        </select>
+                        <button class="btn btn-primary mt-2" type="submit" data-loading-text="Saving...">Update Assignment</button>
+                    </form>
+
+                    <form asp-action="UpdateStatus" method="post" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <label class="form-label">Update Status</label>
+                        <select class="form-select" name="NewStatus">
+                            @foreach (var status in Model.Statuses)
+                            {
+                                <option value="@status.Value" selected="@(status.Value == Model.Ticket.Status.ToString())">@status.Text</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Status</button>
+                    </form>
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header section-title">Ticket Overview</div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div>
+                            <div class="info-label">Requester</div>
+                            <div>@Model.Ticket.RequesterUser?.Email</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Category</div>
+                            <div>@Model.Ticket.Category?.Name</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Assigned</div>
+                            <div>@(Model.Ticket.AssignedAdminUser?.Email ?? "Unassigned")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Created</div>
+                            <div>@Model.Ticket.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Updated</div>
+                            <div>@Model.Ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Status</div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @await Html.PartialAsync("_BadgeStatus", Model.Ticket.Status)
+                                @await Html.PartialAsync("_BadgePriority", Model.Ticket.Priority)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4 note-card">
+                <div class="card-header section-title">Internal Notes</div>
+                <div class="card-body">
+                    @if (!Model.InternalNotes.Any())
+                    {
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                        {
+                            Title = "No internal notes",
+                            Message = "Admin-only notes stay hidden from requesters."
+                        })
+                    }
+                    else
+                    {
+                        <div class="comment-timeline">
+                            @foreach (var note in Model.InternalNotes)
+                            {
+                                <div class="comment-card note-card-item">
+                                    <div class="comment-header">
+                                        <div class="fw-semibold">@note.AuthorUser?.Email</div>
+                                        <div class="ticket-meta">@note.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                                    </div>
+                                    <div class="comment-body">@note.Body</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <form asp-action="AddInternalNote" method="post" class="mt-3" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <div class="mb-3">
+                            <label class="form-label">Add Internal Note</label>
+                            <textarea class="form-control" name="NewInternalNote" rows="3" placeholder="Add internal-only notes"></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Note</button>
+                            <button class="btn btn-light" type="reset">Clear</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-header section-title">Actions</div>
+                <div class="card-body">
+                    @if (Model.Ticket.Status != TicketStatus.Closed)
+                    {
+                        <form asp-action="Close" method="post" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." onclick="return confirm('Close this ticket?');">Close Ticket</button>
+                        </form>
+                    }
+                </div>
+            </div>
+            <div class="card mt-4">
+                <div class="card-header section-title">Ticket Overview</div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div>
+                            <div class="info-label">Requester</div>
+                            <div>@Model.Ticket.RequesterUser?.Email</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Category</div>
+                            <div>@Model.Ticket.Category?.Name</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Assigned</div>
+                            <div>@(Model.Ticket.AssignedAdminUser?.Email ?? "Unassigned")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Created</div>
+                            <div>@Model.Ticket.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Updated</div>
+                            <div>@Model.Ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                        </div>
+                        <div>
+                            <div class="info-label">Status</div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @await Html.PartialAsync("_BadgeStatus", Model.Ticket.Status)
+                                @await Html.PartialAsync("_BadgePriority", Model.Ticket.Priority)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    @if (TempData.Peek("Success") != null && TempData.Peek("Success")?.ToString() == "Comment posted.")
+    {
+        <script>
+            const thread = document.getElementById("comment-thread");
+            if (thread) {
+                thread.scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+        </script>
+    }
+}

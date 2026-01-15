@@ -1,0 +1,83 @@
+﻿@model IReadOnlyList<Category>
+@{
+    ViewData["Title"] = "Manage Categories";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Categories",
+        Subtitle = "Manage the categories requesters can use.",
+        Actions = @<a class="btn btn-outline-primary" asp-action="Users">Manage Users</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="card mb-4">
+    <div class="card-header section-title">Quick Add</div>
+    <div class="card-body">
+        <form asp-action="CreateCategory" method="post" class="row g-3 align-items-end" data-disable-on-submit>
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input class="form-control" name="Name" placeholder="e.g., Hardware, Software" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Active</label>
+                <select class="form-select" name="IsActive">
+                    <option value="true" selected>Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary" type="submit" data-loading-text="Adding...">Add Category</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header section-title">Category List</div>
+    <div class="card-body">
+        @if (!Model.Any())
+        {
+            @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+            {
+                Title = "No categories yet",
+                Message = "Add categories to help users classify tickets."
+            })
+        }
+        else
+        {
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var category in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@category.Name</td>
+                            <td>
+                                <span class="badge @(category.IsActive ? "badge-soft" : "badge-muted")">
+                                    @(category.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditCategory" asp-route-id="@category.Id">Edit</a>
+                                @if (category.IsActive)
+                                {
+                                    <form asp-action="DeactivateCategory" method="post" class="d-inline" data-disable-on-submit>
+                                        <input type="hidden" name="id" value="@category.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-loading-text="Deactivating..." onclick="return confirm('Deactivate this category?');">Deactivate</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

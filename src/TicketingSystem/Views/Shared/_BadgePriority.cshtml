@@ -1,0 +1,14 @@
+@model TicketPriority
+@{
+    var cssClass = Model switch
+    {
+        TicketPriority.None => "priority-none",
+        TicketPriority.Low => "priority-low",
+        TicketPriority.Medium => "priority-medium",
+        TicketPriority.High => "priority-high",
+        TicketPriority.Critical => "priority-critical",
+        _ => "priority-none"
+    };
+}
+
+<span class="badge badge-priority @cssClass">@Model</span>

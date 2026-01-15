@@ -1,0 +1,143 @@
+﻿@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Dashboard",
+        Subtitle = "A quick view of ticket health and what needs attention.",
+        Actions = @<a class="btn btn-primary" asp-controller="Tickets" asp-action="Create">Create Ticket</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="row g-3 mb-4">
+    @foreach (var status in Enum.GetValues<TicketStatus>())
+    {
+        <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+            <a class="card status-card" asp-controller="Tickets" asp-action="Index" asp-route-status="@status">
+                <div class="card-body">
+                    <div class="status-card-title">@status</div>
+                    <div class="status-card-count">
+                        @(Model.StatusCounts.TryGetValue(status, out var count) ? count : 0)
+                    </div>
+                </div>
+            </a>
+        </div>
+    }
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header section-title">My Open Tickets</div>
+            <div class="card-body">
+                @if (!Model.MyOpenTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = "No open tickets yet",
+                        Message = "Create your first ticket to get support.",
+                        ActionText = "Create Ticket",
+                        ActionUrl = Url.Action("Create", "Tickets")
+                    })
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var ticket in Model.MyOpenTickets)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
+                                    <div class="ticket-meta">@ticket.Category?.Name</div>
+                                </div>
+                                @await Html.PartialAsync("_BadgeStatus", ticket.Status)
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (User.IsInRole(RoleNames.Admin))
+    {
+        <div class="col-lg-6">
+            <div class="card mb-4 h-100">
+                <div class="card-header section-title">Unassigned Tickets</div>
+                <div class="card-body">
+                    @if (!Model.UnassignedTickets.Any())
+                    {
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                        {
+                            Title = "All tickets are assigned",
+                            Message = "No unassigned tickets at the moment."
+                        })
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var ticket in Model.UnassignedTickets)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
+                                        <div class="ticket-meta">@ticket.Category?.Name</div>
+                                    </div>
+                                    @await Html.PartialAsync("_BadgeStatus", ticket.Status)
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-12">
+            <div class="card">
+                <div class="card-header section-title">Needs Attention</div>
+                <div class="card-body">
+                    @if (!Model.NeedsAttentionTickets.Any())
+                    {
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                        {
+                            Title = "No high priority items",
+                            Message = "Waiting on user or high priority tickets will show up here."
+                        })
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Title</th>
+                                        <th>Status</th>
+                                        <th>Priority</th>
+                                        <th>Category</th>
+                                        <th>Updated</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var ticket in Model.NeedsAttentionTickets)
+                                    {
+                                        <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                            <td class="fw-semibold">#@ticket.Id</td>
+                                            <td>@ticket.Title</td>
+                                            <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
+                                            <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
+                                            <td>@ticket.Category?.Name</td>
+                                            <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>

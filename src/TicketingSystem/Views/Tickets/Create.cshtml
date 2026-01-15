@@ -1,0 +1,64 @@
+﻿@model TicketCreateViewModel
+@{
+    ViewData["Title"] = "Create Ticket";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Create Ticket",
+        Subtitle = "Provide clear details so the team can help quickly.",
+        Actions = @<a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<form asp-action="Create" method="post" enctype="multipart/form-data" data-disable-on-submit>
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header section-title">Issue Details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="Title" class="form-label"></label>
+                        <input asp-for="Title" class="form-control" placeholder="Short summary of the problem" />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <textarea asp-for="Description" class="form-control" rows="7" placeholder="Describe the issue, impact, and any relevant context"></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header section-title">Details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label asp-for="CategoryId" class="form-label">Category</label>
+                        <select asp-for="CategoryId" asp-items="Model.Categories" class="form-select"></select>
+                        <span asp-validation-for="CategoryId" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Priority" class="form-label">Priority</label>
+                        <select asp-for="Priority" class="form-select" asp-items="Html.GetEnumSelectList<TicketPriority>()"></select>
+                        <div class="form-text">Medium is recommended for most issues.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Attachment" class="form-label">Attachment (optional)</label>
+                        <input asp-for="Attachment" type="file" class="form-control" />
+                        <div class="form-text">Include screenshots or logs if helpful.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary" type="submit" data-loading-text="Creating...">Create Ticket</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,95 @@
+﻿@model TicketListViewModel
+@{
+    ViewData["Title"] = "Tickets";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Tickets",
+        Subtitle = "Track, filter, and resolve support requests.",
+        Actions = @<a class="btn btn-primary" asp-action="Create">Create Ticket</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+@await Html.PartialAsync("_TicketFilterBar", Model)
+
+<div class="card">
+    <div class="card-header section-title">Ticket List</div>
+    <div class="card-body">
+        @if (!Model.Tickets.Any())
+        {
+            @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+            {
+                Title = "No tickets yet",
+                Message = "Try adjusting your filters or create a new ticket.",
+                ActionText = "Create Ticket",
+                ActionUrl = Url.Action("Create", "Tickets")
+            })
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Priority</th>
+                            <th>Category</th>
+                            <th>Updated</th>
+                            @if (User.IsInRole(RoleNames.Admin))
+                            {
+                                <th>Assigned</th>
+                            }
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ticket in Model.Tickets)
+                        {
+                            <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                <td class="fw-semibold">#@ticket.Id</td>
+                                <td>
+                                    <div class="fw-semibold">@ticket.Title</div>
+                                    <div class="ticket-meta">@ticket.RequesterUser?.Email</div>
+                                </td>
+                                <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
+                                <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
+                                <td>@ticket.Category?.Name</td>
+                                <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                                @if (User.IsInRole(RoleNames.Admin))
+                                {
+                                    <td>@(ticket.AssignedAdminUser?.Email ?? "Unassigned")</td>
+                                }
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@ticket.Id">View</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted">Page @Model.Page of @Model.TotalPages</div>
+                    <ul class="pagination mb-0">
+                        @for (var i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.Page ? "active" : "")">
+                                <a class="page-link" asp-action="Index"
+                                   asp-route-page="@i"
+                                   asp-route-status="@Model.Status"
+                                   asp-route-priority="@Model.Priority"
+                                   asp-route-categoryId="@Model.CategoryId"
+                                   asp-route-assignedAdminUserId="@Model.AssignedAdminUserId"
+                                   asp-route-search="@Model.Search">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            }
+        }
+    </div>
+</div>

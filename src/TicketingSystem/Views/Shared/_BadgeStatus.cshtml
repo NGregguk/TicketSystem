@@ -1,0 +1,14 @@
+@model TicketStatus
+@{
+    var cssClass = Model switch
+    {
+        TicketStatus.Open => "status-open",
+        TicketStatus.InProgress => "status-inprogress",
+        TicketStatus.WaitingOnUser => "status-waiting",
+        TicketStatus.Resolved => "status-resolved",
+        TicketStatus.Closed => "status-closed",
+        _ => "status-open"
+    };
+}
+
+<span class="badge badge-status @cssClass">@Model</span>

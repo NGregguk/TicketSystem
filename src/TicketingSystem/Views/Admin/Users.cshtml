@@ -1,0 +1,59 @@
+﻿@model IReadOnlyList<UserRoleViewModel>
+@{
+    ViewData["Title"] = "Manage Users";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Users & Roles",
+        Subtitle = "Assign Admin or Requester access.",
+        Actions = @<a class="btn btn-outline-secondary" asp-action="Categories">Back to Categories</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="card">
+    <div class="card-header section-title">User Access</div>
+    <div class="card-body">
+        @if (!Model.Any())
+        {
+            @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+            {
+                Title = "No users found",
+                Message = "Create users and assign roles to get started."
+            })
+        }
+        else
+        {
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Display Name</th>
+                        <th>Role</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@user.Email</td>
+                            <td>@user.DisplayName</td>
+                            <td>@user.Role</td>
+                            <td class="text-end">
+                                <form asp-action="UpdateUserRole" method="post" class="d-flex justify-content-end gap-2" data-disable-on-submit>
+                                    <input type="hidden" name="userId" value="@user.UserId" />
+                                    <select class="form-select form-select-sm" name="role">
+                                        <option value="Requester" selected="@(user.Role == RoleNames.Requester)">Requester</option>
+                                        <option value="Admin" selected="@(user.Role == RoleNames.Admin)">Admin</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-primary" type="submit" data-loading-text="Saving...">Update</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
