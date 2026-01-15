@@ -14,8 +14,8 @@
 
 <div class="section-divider"><span>Status Summary</span></div>
 
-<div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
-    @foreach (var status in Enum.GetValues<TicketStatus>().Where(s => s != TicketStatus.Resolved && s != TicketStatus.Closed))
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+    @foreach (var status in Enum.GetValues<TicketStatus>().Where(s => s != TicketStatus.Resolved))
     {
         <div class="col">
             <a class="card status-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-status="@status">
