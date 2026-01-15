@@ -1,4 +1,5 @@
 ﻿@model DashboardViewModel
+@using System.Text.Json
 @{
     ViewData["Title"] = "Dashboard";
     var header = new PageHeaderViewModel
@@ -75,7 +76,7 @@
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                    <div class="ticket-meta">@ticket.Category?.Name • Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
+                                    <div class="ticket-meta">@ticket.Category?.Name | Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
                                 </div>
                                 @await Html.PartialAsync("_BadgeStatus", ticket.Status)
                             </li>
@@ -108,7 +109,7 @@
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                    <div class="ticket-meta">@ticket.Category?.Name • Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
+                                        <div class="ticket-meta">@ticket.Category?.Name | Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
                                     </div>
                                     @await Html.PartialAsync("_BadgeStatus", ticket.Status)
                                 </li>
@@ -170,3 +171,155 @@
         </div>
     }
 </div>
+
+<div class="d-flex justify-content-between align-items-center mb-2 mt-4">
+    <div class="section-title">Ticket Volume</div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="toggle-volume-chart">
+        Hide Chart
+    </button>
+</div>
+
+<div class="card mb-4" id="volume-chart-card">
+    <div class="card-header section-title">Ticket Volume (Last 14 Days)</div>
+    <div class="card-body">
+        <div class="chart-wrap">
+            <canvas id="ticket-volume-chart" height="120"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="section-title">SLA Health</div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="toggle-sla-chart">
+        Hide Chart
+    </button>
+</div>
+
+<div class="card mb-4" id="sla-chart-card">
+    <div class="card-header section-title">SLA Health (Open Tickets)</div>
+    <div class="card-body">
+        <div class="chart-wrap">
+            <canvas id="sla-health-chart" height="120"></canvas>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        const chartCard = document.getElementById("volume-chart-card");
+        const chartToggle = document.getElementById("toggle-volume-chart");
+        const storedVisibility = localStorage.getItem("dashboardVolumeChart");
+        const isVisible = storedVisibility !== "hidden";
+
+        if (chartCard && chartToggle) {
+            chartCard.classList.toggle("d-none", !isVisible);
+            chartToggle.textContent = isVisible ? "Hide Chart" : "Show Chart";
+
+            chartToggle.addEventListener("click", () => {
+                const nowHidden = !chartCard.classList.contains("d-none") ;
+                chartCard.classList.toggle("d-none", nowHidden);
+                localStorage.setItem("dashboardVolumeChart", nowHidden ? "hidden" : "visible");
+                chartToggle.textContent = nowHidden ? "Show Chart" : "Hide Chart";
+            });
+        }
+
+        const volumeLabels = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels));
+        const volumeCreated = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts));
+        const volumeClosed = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts));
+
+        const ctx = document.getElementById("ticket-volume-chart");
+        if (ctx) {
+            const styles = getComputedStyle(document.body);
+            const textColor = styles.getPropertyValue("--text").trim() || "#e6e7e9";
+            const gridColor = styles.getPropertyValue("--border").trim() || "#2a2d31";
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: volumeLabels,
+                    datasets: [
+                        {
+                            label: "Created",
+                            data: volumeCreated,
+                            borderColor: "#0f4c6b",
+                            backgroundColor: "rgba(15, 76, 107, 0.15)",
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: "Closed",
+                            data: volumeClosed,
+                            borderColor: "#16a34a",
+                            backgroundColor: "rgba(22, 163, 74, 0.12)",
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0, color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: textColor }
+                        }
+                    }
+                }
+            });
+        }
+
+        const slaCard = document.getElementById("sla-chart-card");
+        const slaToggle = document.getElementById("toggle-sla-chart");
+        const slaStored = localStorage.getItem("dashboardSlaChart");
+        const slaVisible = slaStored !== "hidden";
+
+        if (slaCard && slaToggle) {
+            slaCard.classList.toggle("d-none", !slaVisible);
+            slaToggle.textContent = slaVisible ? "Hide Chart" : "Show Chart";
+
+            slaToggle.addEventListener("click", () => {
+                const nowHidden = !slaCard.classList.contains("d-none");
+                slaCard.classList.toggle("d-none", nowHidden);
+                localStorage.setItem("dashboardSlaChart", nowHidden ? "hidden" : "visible");
+                slaToggle.textContent = nowHidden ? "Show Chart" : "Hide Chart";
+            });
+        }
+
+        const slaCtx = document.getElementById("sla-health-chart");
+        if (slaCtx) {
+            const styles = getComputedStyle(document.body);
+            const textColor = styles.getPropertyValue("--text").trim() || "#e6e7e9";
+            const gridColor = styles.getPropertyValue("--border").trim() || "#2a2d31";
+            new Chart(slaCtx, {
+                type: "doughnut",
+                data: {
+                    labels: ["On Track", "Due Soon", "Overdue"],
+                    datasets: [{
+                        data: [@Model.OnTrackCount, @Model.DueSoonCount, @Model.OverdueCount],
+                        backgroundColor: ["#16a34a", "#f59e0b", "#dc2626"],
+                        borderColor: gridColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    }
+                }
+            });
+        }
+    </script>
+}

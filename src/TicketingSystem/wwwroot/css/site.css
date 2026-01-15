@@ -169,6 +169,11 @@ body {
   font-weight: 600;
 }
 
+.chart-wrap {
+  position: relative;
+  height: 240px;
+}
+
 .badge-status,
 .badge-priority {
   font-size: 0.72rem;

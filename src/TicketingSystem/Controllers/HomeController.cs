@@ -41,6 +41,31 @@ public class HomeController : Controller
             .Take(5)
             .ToListAsync();
 
+        var nowUtc = DateTime.UtcNow;
+        var startDate = nowUtc.Date.AddDays(-13);
+        var volumeTickets = await _db.Tickets
+            .AsNoTracking()
+            .Where(t => t.CreatedAtUtc >= startDate || (t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate))
+            .Select(t => new { t.CreatedAtUtc, t.ClosedAtUtc })
+            .ToListAsync();
+
+        var dateRange = Enumerable.Range(0, 14)
+            .Select(offset => startDate.AddDays(offset))
+            .ToList();
+
+        var createdLookup = volumeTickets
+            .GroupBy(t => t.CreatedAtUtc.Date)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var closedLookup = volumeTickets
+            .Where(t => t.ClosedAtUtc.HasValue)
+            .GroupBy(t => t.ClosedAtUtc!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var volumeLabels = dateRange.Select(d => d.ToString("MMM d")).ToList();
+        var volumeCreated = dateRange.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+        var volumeClosed = dateRange.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+
         var slaCandidates = await _db.Tickets
             .AsNoTracking()
             .Where(t => t.Status != TicketStatus.Closed)
@@ -49,6 +74,7 @@ public class HomeController : Controller
 
         var dueSoonCount = 0;
         var overdueCount = 0;
+        var onTrackCount = 0;
         foreach (var ticket in slaCandidates)
         {
             var slaState = SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions);
@@ -59,6 +85,10 @@ public class HomeController : Controller
             else if (slaState == SlaState.DueSoon)
             {
                 dueSoonCount++;
+            }
+            else
+            {
+                onTrackCount++;
             }
         }
 
@@ -91,7 +121,11 @@ public class HomeController : Controller
             UnassignedTickets = unassignedTickets,
             NeedsAttentionTickets = needsAttention,
             DueSoonCount = dueSoonCount,
-            OverdueCount = overdueCount
+            OverdueCount = overdueCount,
+            OnTrackCount = onTrackCount,
+            VolumeLabels = volumeLabels,
+            VolumeCreatedCounts = volumeCreated,
+            VolumeClosedCounts = volumeClosed
         };
 
         return View(viewModel);

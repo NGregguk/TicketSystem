@@ -79,7 +79,3 @@ Migrations are included in `src/TicketingSystem/Migrations`.
 ## Notes
 - Logs are written to console and `logs/log-*.txt`.
 - Attachment uploads are stored on disk; metadata is stored in SQL Server.
-## SLA indicators
-- SLA thresholds are configured in `src/TicketingSystem/appsettings.json` under `Sla`.
-- Dashboard shows Due Soon / Overdue counts and links to SLA-filtered ticket list.
-- Ticket list includes Age + SLA columns with badges.
