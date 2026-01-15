@@ -73,6 +73,12 @@ If SMTP is not configured, email is skipped with a warning log.
 - Requester: create tickets, view own tickets, add public comments, close own tickets.
 - Admin: view all tickets, assign, update status/priority/category, add internal notes, manage categories/users.
 
+## Reports & exports
+- Admin-only Reports page includes ticket volume, SLA health, and workload by admin.
+- Export options:
+  - CSV: raw ticket data with SLA state.
+  - PDF: summary report with visual indicators.
+
 ## Database
 Migrations are included in `src/TicketingSystem/Migrations`.
 

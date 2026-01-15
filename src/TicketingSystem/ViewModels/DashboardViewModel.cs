@@ -14,4 +14,6 @@ public class DashboardViewModel
     public IReadOnlyList<string> VolumeLabels { get; set; } = Array.Empty<string>();
     public IReadOnlyList<int> VolumeCreatedCounts { get; set; } = Array.Empty<int>();
     public IReadOnlyList<int> VolumeClosedCounts { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<string> CategoryLabels { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<int> CategoryCounts { get; set; } = Array.Empty<int>();
 }

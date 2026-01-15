@@ -1,1 +1,6 @@
-﻿App_Data/Uploads/
+**/bin/
+**/obj/
+.vs/
+logs/
+App_Data/Uploads/
+src/TicketingSystem/wwwroot/images/logo.png

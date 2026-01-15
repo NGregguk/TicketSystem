@@ -25,6 +25,7 @@
                     <li class="nav-item"><a class="nav-link" asp-controller="Tickets" asp-action="Create">Create Ticket</a></li>
                     @if (User.IsInRole(RoleNames.Admin))
                     {
+                        <li class="nav-item"><a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a></li>
                         <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Categories">Admin</a></li>
                     }
                 </ul>

@@ -198,6 +198,18 @@
                         </select>
                         <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Priority</button>
                     </form>
+
+                    <form asp-action="UpdateCategory" method="post" class="mt-3" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <label class="form-label">Update Category</label>
+                        <select class="form-select" name="NewCategoryId">
+                            @foreach (var category in Model.Categories)
+                            {
+                                <option value="@category.Value" selected="@(category.Value == Model.Ticket.CategoryId.ToString())">@category.Text</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Category</button>
+                    </form>
                 </div>
             </div>
             <div class="card mb-4">

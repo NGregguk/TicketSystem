@@ -1,0 +1,191 @@
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TicketingSystem.Data;
+using TicketingSystem.Helpers;
+using TicketingSystem.Models;
+using TicketingSystem.Options;
+using TicketingSystem.Services;
+using TicketingSystem.ViewModels;
+
+namespace TicketingSystem.Controllers;
+
+[Authorize(Roles = RoleNames.Admin)]
+public class ReportsController : Controller
+{
+    private readonly ApplicationDbContext _db;
+    private readonly SlaOptions _slaOptions;
+    private readonly ReportsPdfBuilder _pdfBuilder;
+
+    public ReportsController(ApplicationDbContext db, IOptions<SlaOptions> slaOptions, ReportsPdfBuilder pdfBuilder)
+    {
+        _db = db;
+        _slaOptions = slaOptions.Value;
+        _pdfBuilder = pdfBuilder;
+    }
+
+    public async Task<IActionResult> Index()
+    {
+        var model = await BuildReportAsync();
+        return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv()
+    {
+        var tickets = await _db.Tickets
+            .AsNoTracking()
+            .Include(t => t.Category)
+            .Include(t => t.RequesterUser)
+            .Include(t => t.AssignedAdminUser)
+            .OrderByDescending(t => t.CreatedAtUtc)
+            .ToListAsync();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Id,Title,Status,Priority,Category,Requester,AssignedAdmin,CreatedAtUtc,UpdatedAtUtc,ClosedAtUtc,SlaState");
+
+        foreach (var ticket in tickets)
+        {
+            var requesterName = ticket.RequesterUser?.DisplayName ?? ticket.RequesterUser?.Email ?? string.Empty;
+            var assignedName = ticket.AssignedAdminUser?.DisplayName ?? ticket.AssignedAdminUser?.Email ?? string.Empty;
+            var slaState = ticket.Status == TicketStatus.Closed
+                ? "Closed"
+                : SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions).ToString();
+
+            builder.AppendLine(string.Join(",",
+                ticket.Id,
+                EscapeCsv(ticket.Title),
+                ticket.Status,
+                ticket.Priority,
+                EscapeCsv(ticket.Category?.Name),
+                EscapeCsv(requesterName),
+                EscapeCsv(assignedName),
+                ticket.CreatedAtUtc.ToString("O"),
+                ticket.UpdatedAtUtc.ToString("O"),
+                ticket.ClosedAtUtc?.ToString("O") ?? string.Empty,
+                slaState));
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+        var fileName = $"ticket-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv";
+        return File(bytes, "text/csv", fileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf()
+    {
+        var model = await BuildReportAsync();
+        var pdfBytes = _pdfBuilder.Build(model);
+        var fileName = $"ticket-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.pdf";
+        return File(pdfBytes, "application/pdf", fileName);
+    }
+
+    private async Task<ReportsViewModel> BuildReportAsync()
+    {
+        var nowUtc = DateTime.UtcNow;
+        var startDate = nowUtc.Date.AddDays(-29);
+        var endDate = nowUtc.Date;
+
+        var volumeTickets = await _db.Tickets
+            .AsNoTracking()
+            .Where(t => t.CreatedAtUtc >= startDate || (t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate))
+            .Select(t => new { t.CreatedAtUtc, t.ClosedAtUtc })
+            .ToListAsync();
+
+        var dateRange = Enumerable.Range(0, 30)
+            .Select(offset => startDate.AddDays(offset))
+            .ToList();
+
+        var createdLookup = volumeTickets
+            .GroupBy(t => t.CreatedAtUtc.Date)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var closedLookup = volumeTickets
+            .Where(t => t.ClosedAtUtc.HasValue)
+            .GroupBy(t => t.ClosedAtUtc!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var volumeLabels = dateRange.Select(d => d.ToString("MMM d")).ToList();
+        var volumeCreated = dateRange.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+        var volumeClosed = dateRange.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+
+        var slaCandidates = await _db.Tickets
+            .AsNoTracking()
+            .Where(t => t.Status != TicketStatus.Closed)
+            .Select(t => new { t.CreatedAtUtc, t.Priority })
+            .ToListAsync();
+
+        var dueSoonCount = 0;
+        var overdueCount = 0;
+        var onTrackCount = 0;
+        foreach (var ticket in slaCandidates)
+        {
+            var slaState = SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions);
+            if (slaState == SlaState.Overdue)
+            {
+                overdueCount++;
+            }
+            else if (slaState == SlaState.DueSoon)
+            {
+                dueSoonCount++;
+            }
+            else
+            {
+                onTrackCount++;
+            }
+        }
+
+        var workloadTickets = await _db.Tickets
+            .AsNoTracking()
+            .Include(t => t.AssignedAdminUser)
+            .Where(t => t.Status != TicketStatus.Closed)
+            .ToListAsync();
+
+        var workloadItems = workloadTickets
+            .GroupBy(t => t.AssignedAdminUserId == null
+                ? "Unassigned"
+                : (t.AssignedAdminUser?.DisplayName ?? t.AssignedAdminUser?.Email ?? "Unknown"))
+            .Select(g => new ReportsWorkloadItem
+            {
+                Name = g.Key,
+                Count = g.Count()
+            })
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.Name)
+            .ToList();
+
+        var totalOpenCount = await _db.Tickets.CountAsync(t => t.Status != TicketStatus.Closed);
+        var closedLast30Days = await _db.Tickets.CountAsync(t => t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate);
+
+        return new ReportsViewModel
+        {
+            GeneratedAtUtc = nowUtc,
+            StartDateUtc = startDate,
+            EndDateUtc = endDate,
+            TotalOpenCount = totalOpenCount,
+            ClosedLast30DaysCount = closedLast30Days,
+            OnTrackCount = onTrackCount,
+            DueSoonCount = dueSoonCount,
+            OverdueCount = overdueCount,
+            VolumeLabels = volumeLabels,
+            VolumeCreatedCounts = volumeCreated,
+            VolumeClosedCounts = volumeClosed,
+            WorkloadItems = workloadItems
+        };
+    }
+
+    private static string EscapeCsv(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var escaped = value.Replace("\"", "\"\"");
+        return escaped.Contains(',') || escaped.Contains('"') || escaped.Contains('\n')
+            ? $"\"{escaped}\""
+            : escaped;
+    }
+}

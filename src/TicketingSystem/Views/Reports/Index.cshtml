@@ -1,0 +1,240 @@
+@model ReportsViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Reports";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Reports",
+        Subtitle = "Operational trends, SLA health, and team workload.",
+        Actions = @<div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" asp-action="ExportCsv">Export CSV</a>
+            <a class="btn btn-primary" asp-action="ExportPdf">Export PDF</a>
+        </div>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="section-divider"><span>Overview</span></div>
+
+<div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+    <div class="col">
+        <div class="card report-kpi">
+            <div class="card-body">
+                <div class="report-kpi-label">Open Tickets</div>
+                <div class="report-kpi-value">@Model.TotalOpenCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card report-kpi">
+            <div class="card-body">
+                <div class="report-kpi-label">Closed (30d)</div>
+                <div class="report-kpi-value">@Model.ClosedLast30DaysCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card report-kpi">
+            <div class="card-body">
+                <div class="report-kpi-label">Due Soon</div>
+                <div class="report-kpi-value">@Model.DueSoonCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card report-kpi">
+            <div class="card-body">
+                <div class="report-kpi-label">Overdue</div>
+                <div class="report-kpi-value">@Model.OverdueCount</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-divider"><span>Charts</span></div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header section-title">Ticket Volume (Last 30 Days)</div>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="reports-volume-chart" height="140"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header section-title">SLA Health (Open Tickets)</div>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="reports-sla-chart" height="140"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header section-title">Workload by Admin (Open Tickets)</div>
+            <div class="card-body">
+                <div class="chart-wrap">
+                    <canvas id="reports-workload-chart" height="160"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header section-title">Workload Breakdown</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Owner</th>
+                                <th class="text-end">Open</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.WorkloadItems)
+                            {
+                                <tr>
+                                    <td>@item.Name</td>
+                                    <td class="text-end">@item.Count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        const styles = getComputedStyle(document.body);
+        const isDark = document.body.classList.contains("dark-mode");
+        const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
+        const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
+
+        const volumeLabels = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels));
+        const volumeCreated = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts));
+        const volumeClosed = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts));
+
+        const volumeCtx = document.getElementById("reports-volume-chart");
+        if (volumeCtx) {
+            new Chart(volumeCtx, {
+                type: "line",
+                data: {
+                    labels: volumeLabels,
+                    datasets: [
+                        {
+                            label: "Created",
+                            data: volumeCreated,
+                            borderColor: isDark ? "#6ea8c7" : "#0f4c6b",
+                            backgroundColor: isDark ? "rgba(110, 168, 199, 0.2)" : "rgba(15, 76, 107, 0.15)",
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: "Closed",
+                            data: volumeClosed,
+                            borderColor: isDark ? "#86efac" : "#16a34a",
+                            backgroundColor: isDark ? "rgba(134, 239, 172, 0.18)" : "rgba(22, 163, 74, 0.12)",
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0, color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    }
+                }
+            });
+        }
+
+        const slaCtx = document.getElementById("reports-sla-chart");
+        if (slaCtx) {
+            new Chart(slaCtx, {
+                type: "doughnut",
+                data: {
+                    labels: ["On Track", "Due Soon", "Overdue"],
+                    datasets: [{
+                        data: [@Model.OnTrackCount, @Model.DueSoonCount, @Model.OverdueCount],
+                        backgroundColor: isDark
+                            ? ["#4ade80", "#fbbf24", "#f87171"]
+                            : ["#16a34a", "#f59e0b", "#dc2626"],
+                        borderColor: gridColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    }
+                }
+            });
+        }
+
+        const workloadLabels = @Html.Raw(JsonSerializer.Serialize(Model.WorkloadItems.Select(x => x.Name)));
+        const workloadCounts = @Html.Raw(JsonSerializer.Serialize(Model.WorkloadItems.Select(x => x.Count)));
+        const workloadCtx = document.getElementById("reports-workload-chart");
+        if (workloadCtx) {
+            new Chart(workloadCtx, {
+                type: "bar",
+                data: {
+                    labels: workloadLabels,
+                    datasets: [{
+                        label: "Open Tickets",
+                        data: workloadCounts,
+                        backgroundColor: isDark ? "rgba(110, 168, 199, 0.6)" : "rgba(15, 76, 107, 0.6)",
+                        borderColor: isDark ? "#6ea8c7" : "#0f4c6b",
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: { precision: 0, color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        y: {
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: textColor } }
+                    }
+                }
+            });
+        }
+    </script>
+}

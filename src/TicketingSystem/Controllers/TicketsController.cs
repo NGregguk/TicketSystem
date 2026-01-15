@@ -271,6 +271,10 @@ public class TicketsController : Controller
         }
 
         var adminUsers = await _userManager.GetUsersInRoleAsync(RoleNames.Admin);
+        var categories = await _db.Categories
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
 
         var viewModel = new TicketDetailViewModel
         {
@@ -280,7 +284,8 @@ public class TicketsController : Controller
             Attachments = ticket.Attachments.OrderByDescending(a => a.UploadedAtUtc).ToList(),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status)),
-            Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString(), p == ticket.Priority))
+            Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString(), p == ticket.Priority)),
+            Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString(), c.Id == ticket.CategoryId))
         };
 
         return View(viewModel);
@@ -481,6 +486,32 @@ public class TicketsController : Controller
 
         _logger.LogInformation("Ticket {TicketId} priority changed to {Priority}", ticket.Id, ticket.Priority);
         TempData["Success"] = "Priority updated.";
+
+        return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateCategory(int id, TicketDetailViewModel model)
+    {
+        if (!model.NewCategoryId.HasValue)
+        {
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var ticket = await _db.Tickets.FindAsync(id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        ticket.CategoryId = model.NewCategoryId.Value;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Ticket {TicketId} category changed to {CategoryId}", ticket.Id, ticket.CategoryId);
+        TempData["Success"] = "Category updated.";
 
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }

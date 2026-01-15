@@ -66,6 +66,19 @@ public class HomeController : Controller
         var volumeCreated = dateRange.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
         var volumeClosed = dateRange.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
 
+        var categoryCounts = await _db.Tickets
+            .AsNoTracking()
+            .Include(t => t.Category)
+            .Where(t => t.Status != TicketStatus.Closed)
+            .GroupBy(t => t.Category!.Name)
+            .Select(g => new { Category = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .Take(5)
+            .ToListAsync();
+
+        var categoryLabels = categoryCounts.Select(x => x.Category).ToList();
+        var categoryData = categoryCounts.Select(x => x.Count).ToList();
+
         var slaCandidates = await _db.Tickets
             .AsNoTracking()
             .Where(t => t.Status != TicketStatus.Closed)
@@ -125,7 +138,9 @@ public class HomeController : Controller
             OnTrackCount = onTrackCount,
             VolumeLabels = volumeLabels,
             VolumeCreatedCounts = volumeCreated,
-            VolumeClosedCounts = volumeClosed
+            VolumeClosedCounts = volumeClosed,
+            CategoryLabels = categoryLabels,
+            CategoryCounts = categoryData
         };
 
         return View(viewModel);

@@ -147,6 +147,23 @@ body {
   min-height: 110px;
 }
 
+.report-kpi {
+  min-height: 110px;
+}
+
+.report-kpi-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.report-kpi-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
 .sla-summary-card {
   border-left: 4px solid var(--border);
   text-decoration: none;
