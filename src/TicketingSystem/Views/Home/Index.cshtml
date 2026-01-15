@@ -231,8 +231,9 @@
         const ctx = document.getElementById("ticket-volume-chart");
         if (ctx) {
             const styles = getComputedStyle(document.body);
-            const textColor = styles.getPropertyValue("--text").trim() || "#e6e7e9";
-            const gridColor = styles.getPropertyValue("--border").trim() || "#2a2d31";
+            const isDark = document.body.classList.contains("dark-mode");
+            const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
+            const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
             new Chart(ctx, {
                 type: "line",
                 data: {
@@ -241,16 +242,16 @@
                         {
                             label: "Created",
                             data: volumeCreated,
-                            borderColor: "#0f4c6b",
-                            backgroundColor: "rgba(15, 76, 107, 0.15)",
+                            borderColor: isDark ? "#6ea8c7" : "#0f4c6b",
+                            backgroundColor: isDark ? "rgba(110, 168, 199, 0.2)" : "rgba(15, 76, 107, 0.15)",
                             tension: 0.3,
                             fill: true
                         },
                         {
                             label: "Closed",
                             data: volumeClosed,
-                            borderColor: "#16a34a",
-                            backgroundColor: "rgba(22, 163, 74, 0.12)",
+                            borderColor: isDark ? "#86efac" : "#16a34a",
+                            backgroundColor: isDark ? "rgba(134, 239, 172, 0.18)" : "rgba(22, 163, 74, 0.12)",
                             tension: 0.3,
                             fill: true
                         }
@@ -299,15 +300,18 @@
         const slaCtx = document.getElementById("sla-health-chart");
         if (slaCtx) {
             const styles = getComputedStyle(document.body);
-            const textColor = styles.getPropertyValue("--text").trim() || "#e6e7e9";
-            const gridColor = styles.getPropertyValue("--border").trim() || "#2a2d31";
+            const isDark = document.body.classList.contains("dark-mode");
+            const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
+            const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
             new Chart(slaCtx, {
                 type: "doughnut",
                 data: {
                     labels: ["On Track", "Due Soon", "Overdue"],
                     datasets: [{
                         data: [@Model.OnTrackCount, @Model.DueSoonCount, @Model.OverdueCount],
-                        backgroundColor: ["#16a34a", "#f59e0b", "#dc2626"],
+                        backgroundColor: isDark
+                            ? ["#4ade80", "#fbbf24", "#f87171"]
+                            : ["#16a34a", "#f59e0b", "#dc2626"],
                         borderColor: gridColor,
                         borderWidth: 1
                     }]
