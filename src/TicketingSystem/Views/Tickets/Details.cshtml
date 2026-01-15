@@ -13,7 +13,7 @@
             {
                 <form asp-action="Close" method="post" data-disable-on-submit>
                     <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                    <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." onclick="return confirm('Close this ticket?');">Close</button>
+                    <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." data-confirm="Close this ticket?">Close</button>
                 </form>
             }
         </div>
@@ -134,7 +134,10 @@
                                     <div class="fw-semibold">@attachment.OriginalFileName</div>
                                     <div class="ticket-meta">Uploaded by @(string.IsNullOrWhiteSpace(attachment.UploadedByUser?.DisplayName) ? attachment.UploadedByUser?.Email : attachment.UploadedByUser?.DisplayName) on @attachment.UploadedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
                                 </div>
-                                <span class="text-muted">@string.Format("{0:N0} KB", attachment.SizeBytes / 1024)</span>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="text-muted">@string.Format("{0:N0} KB", attachment.SizeBytes / 1024)</span>
+                                    <a class="btn btn-sm btn-outline-secondary" asp-action="DownloadAttachment" asp-route-id="@Model.Ticket.Id" asp-route-attachmentId="@attachment.Id">Download</a>
+                                </div>
                             </li>
                         }
                     </ul>
@@ -318,7 +321,7 @@
                     {
                         <form asp-action="Close" method="post" data-disable-on-submit>
                             <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                            <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." onclick="return confirm('Close this ticket?');">Close Ticket</button>
+                            <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." data-confirm="Close this ticket?">Close Ticket</button>
                         </form>
                     }
                 </div>

@@ -23,6 +23,8 @@ public class TicketsController : Controller
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<TicketsController> _logger;
     private readonly SlaOptions _slaOptions;
+    private readonly UploadOptions _uploadOptions;
+    private readonly IWebHostEnvironment _environment;
 
     public TicketsController(
         ApplicationDbContext db,
@@ -30,7 +32,9 @@ public class TicketsController : Controller
         IEmailSender emailSender,
         IFileStorage fileStorage,
         ILogger<TicketsController> logger,
-        IOptions<SlaOptions> slaOptions)
+        IOptions<SlaOptions> slaOptions,
+        IOptions<UploadOptions> uploadOptions,
+        IWebHostEnvironment environment)
     {
         _db = db;
         _userManager = userManager;
@@ -38,6 +42,8 @@ public class TicketsController : Controller
         _fileStorage = fileStorage;
         _logger = logger;
         _slaOptions = slaOptions.Value;
+        _uploadOptions = uploadOptions.Value;
+        _environment = environment;
     }
 
     public async Task<IActionResult> Index(
@@ -581,5 +587,48 @@ public class TicketsController : Controller
         _logger.LogInformation("Attachment uploaded for ticket {TicketId}", ticket.Id);
         TempData["Success"] = "Attachment uploaded.";
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadAttachment(int id, int attachmentId)
+    {
+        var ticket = await _db.Tickets
+            .Include(t => t.RequesterUser)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        if (!User.IsInRole(RoleNames.Admin))
+        {
+            var userId = _userManager.GetUserId(User) ?? string.Empty;
+            if (ticket.RequesterUserId != userId)
+            {
+                return Forbid();
+            }
+        }
+
+        var attachment = await _db.TicketAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.TicketId == id);
+        if (attachment == null)
+        {
+            return NotFound();
+        }
+
+        var root = Path.IsPathRooted(_uploadOptions.RootPath)
+            ? _uploadOptions.RootPath
+            : Path.Combine(_environment.ContentRootPath, _uploadOptions.RootPath);
+
+        var fullPath = Path.Combine(root, attachment.StoredFileName);
+        if (!System.IO.File.Exists(fullPath))
+        {
+            return NotFound();
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(attachment.ContentType)
+            ? "application/octet-stream"
+            : attachment.ContentType;
+
+        return PhysicalFile(fullPath, contentType, attachment.OriginalFileName);
     }
 }

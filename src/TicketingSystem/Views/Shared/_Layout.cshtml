@@ -132,6 +132,16 @@
                 });
             });
         });
+
+        document.querySelectorAll("form").forEach((form) => {
+            form.addEventListener("submit", (event) => {
+                const submitter = event.submitter;
+                const confirmMessage = submitter ? submitter.getAttribute("data-confirm") : null;
+                if (confirmMessage && !window.confirm(confirmMessage)) {
+                    event.preventDefault();
+                }
+            });
+        });
     </script>
     @RenderSection("Scripts", required: false)
 </body>
