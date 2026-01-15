@@ -12,10 +12,12 @@
 
 @await Html.PartialAsync("_PageHeader", header)
 
-<div class="row g-3 mb-4">
+<div class="section-divider"><span>Status Summary</span></div>
+
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
     @foreach (var status in Enum.GetValues<TicketStatus>())
     {
-        <div class="col-xl-2 col-lg-3 col-md-4 col-6">
+        <div class="col">
             <a class="card status-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-status="@status">
                 <div class="card-body">
                     <div class="status-card-title">@status</div>
@@ -27,6 +29,8 @@
         </div>
     }
 </div>
+
+<div class="section-divider"><span>SLA Summary</span></div>
 
 <div class="row g-3 mb-4">
     <div class="col-lg-4 col-md-6">
@@ -63,6 +67,8 @@
         </a>
     </div>
 </div>
+
+<div class="section-divider"><span>Workload</span></div>
 
 <div class="row g-4 @(User.IsInRole(RoleNames.Admin) ? "" : "justify-content-center")">
     <div class="col-lg-6 @(User.IsInRole(RoleNames.Admin) ? "" : "col-md-8")">
@@ -182,6 +188,8 @@
         </div>
     }
 </div>
+
+<div class="section-divider"><span>Reporting</span></div>
 
 <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
     <div class="section-title">Ticket Volume</div>
