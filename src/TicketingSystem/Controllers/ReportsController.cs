@@ -7,7 +7,6 @@ using TicketingSystem.Data;
 using TicketingSystem.Helpers;
 using TicketingSystem.Models;
 using TicketingSystem.Options;
-using TicketingSystem.Services;
 using TicketingSystem.ViewModels;
 
 namespace TicketingSystem.Controllers;
@@ -17,13 +16,11 @@ public class ReportsController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly SlaOptions _slaOptions;
-    private readonly ReportsPdfBuilder _pdfBuilder;
 
-    public ReportsController(ApplicationDbContext db, IOptions<SlaOptions> slaOptions, ReportsPdfBuilder pdfBuilder)
+    public ReportsController(ApplicationDbContext db, IOptions<SlaOptions> slaOptions)
     {
         _db = db;
         _slaOptions = slaOptions.Value;
-        _pdfBuilder = pdfBuilder;
     }
 
     public async Task<IActionResult> Index()
@@ -71,15 +68,6 @@ public class ReportsController : Controller
         var bytes = Encoding.UTF8.GetBytes(builder.ToString());
         var fileName = $"ticket-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv";
         return File(bytes, "text/csv", fileName);
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> ExportPdf()
-    {
-        var model = await BuildReportAsync();
-        var pdfBytes = _pdfBuilder.Build(model);
-        var fileName = $"ticket-report-{DateTime.UtcNow:yyyyMMdd-HHmm}.pdf";
-        return File(pdfBytes, "application/pdf", fileName);
     }
 
     private async Task<ReportsViewModel> BuildReportAsync()

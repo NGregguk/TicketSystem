@@ -77,7 +77,6 @@ If SMTP is not configured, email is skipped with a warning log.
 - Admin-only Reports page includes ticket volume, SLA health, and workload by admin.
 - Export options:
   - CSV: raw ticket data with SLA state.
-  - PDF: summary report with visual indicators.
 
 ## Database
 Migrations are included in `src/TicketingSystem/Migrations`.
