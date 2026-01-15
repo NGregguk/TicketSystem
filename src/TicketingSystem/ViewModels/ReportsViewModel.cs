@@ -13,11 +13,26 @@ public class ReportsViewModel
     public List<string> VolumeLabels { get; set; } = new();
     public List<int> VolumeCreatedCounts { get; set; } = new();
     public List<int> VolumeClosedCounts { get; set; } = new();
+    public List<string> VolumeLabels14 { get; set; } = new();
+    public List<int> VolumeCreatedCounts14 { get; set; } = new();
+    public List<int> VolumeClosedCounts14 { get; set; } = new();
+    public List<string> VolumeDateKeys { get; set; } = new();
+    public List<string> VolumeDateKeys14 { get; set; } = new();
     public List<ReportsWorkloadItem> WorkloadItems { get; set; } = new();
+    public List<ReportsTicketItem> UnassignedTickets { get; set; } = new();
 }
 
 public class ReportsWorkloadItem
 {
+    public string? UserId { get; set; }
     public string Name { get; set; } = string.Empty;
     public int Count { get; set; }
+}
+
+public class ReportsTicketItem
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; }
+    public string? Category { get; set; }
 }

@@ -201,6 +201,10 @@ body {
   height: 240px;
 }
 
+.chart-wrap canvas {
+  cursor: pointer;
+}
+
 .section-divider {
   display: flex;
   align-items: center;

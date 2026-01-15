@@ -42,14 +42,14 @@ public class HomeController : Controller
             .ToListAsync();
 
         var nowUtc = DateTime.UtcNow;
-        var startDate = nowUtc.Date.AddDays(-13);
+        var startDate = nowUtc.Date.AddDays(-29);
         var volumeTickets = await _db.Tickets
             .AsNoTracking()
             .Where(t => t.CreatedAtUtc >= startDate || (t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate))
             .Select(t => new { t.CreatedAtUtc, t.ClosedAtUtc })
             .ToListAsync();
 
-        var dateRange = Enumerable.Range(0, 14)
+        var dateRange30 = Enumerable.Range(0, 30)
             .Select(offset => startDate.AddDays(offset))
             .ToList();
 
@@ -62,9 +62,15 @@ public class HomeController : Controller
             .GroupBy(t => t.ClosedAtUtc!.Value.Date)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        var volumeLabels = dateRange.Select(d => d.ToString("MMM d")).ToList();
-        var volumeCreated = dateRange.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
-        var volumeClosed = dateRange.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+        var volumeLabels30 = dateRange30.Select(d => d.ToString("MMM d")).ToList();
+        var volumeDateKeys30 = dateRange30.Select(d => d.ToString("yyyy-MM-dd")).ToList();
+        var volumeCreated30 = dateRange30.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+        var volumeClosed30 = dateRange30.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+
+        var volumeLabels14 = volumeLabels30.TakeLast(14).ToList();
+        var volumeDateKeys14 = volumeDateKeys30.TakeLast(14).ToList();
+        var volumeCreated14 = volumeCreated30.TakeLast(14).ToList();
+        var volumeClosed14 = volumeClosed30.TakeLast(14).ToList();
 
         var categoryCounts = await _db.Tickets
             .AsNoTracking()
@@ -136,9 +142,14 @@ public class HomeController : Controller
             DueSoonCount = dueSoonCount,
             OverdueCount = overdueCount,
             OnTrackCount = onTrackCount,
-            VolumeLabels = volumeLabels,
-            VolumeCreatedCounts = volumeCreated,
-            VolumeClosedCounts = volumeClosed,
+            VolumeLabels14 = volumeLabels14,
+            VolumeCreatedCounts14 = volumeCreated14,
+            VolumeClosedCounts14 = volumeClosed14,
+            VolumeLabels30 = volumeLabels30,
+            VolumeCreatedCounts30 = volumeCreated30,
+            VolumeClosedCounts30 = volumeClosed30,
+            VolumeDateKeys14 = volumeDateKeys14,
+            VolumeDateKeys30 = volumeDateKeys30,
             CategoryLabels = categoryLabels,
             CategoryCounts = categoryData
         };

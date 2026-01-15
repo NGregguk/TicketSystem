@@ -96,8 +96,13 @@ public class ReportsController : Controller
             .ToDictionary(g => g.Key, g => g.Count());
 
         var volumeLabels = dateRange.Select(d => d.ToString("MMM d")).ToList();
+        var volumeDateKeys = dateRange.Select(d => d.ToString("yyyy-MM-dd")).ToList();
         var volumeCreated = dateRange.Select(d => createdLookup.TryGetValue(d, out var count) ? count : 0).ToList();
         var volumeClosed = dateRange.Select(d => closedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+        var volumeLabels14 = volumeLabels.TakeLast(14).ToList();
+        var volumeDateKeys14 = volumeDateKeys.TakeLast(14).ToList();
+        var volumeCreated14 = volumeCreated.TakeLast(14).ToList();
+        var volumeClosed14 = volumeClosed.TakeLast(14).ToList();
 
         var slaCandidates = await _db.Tickets
             .AsNoTracking()
@@ -132,17 +137,38 @@ public class ReportsController : Controller
             .ToListAsync();
 
         var workloadItems = workloadTickets
-            .GroupBy(t => t.AssignedAdminUserId == null
-                ? "Unassigned"
-                : (t.AssignedAdminUser?.DisplayName ?? t.AssignedAdminUser?.Email ?? "Unknown"))
-            .Select(g => new ReportsWorkloadItem
+            .GroupBy(t => t.AssignedAdminUserId)
+            .Select(g =>
             {
-                Name = g.Key,
-                Count = g.Count()
+                var sample = g.FirstOrDefault();
+                var name = sample?.AssignedAdminUser?.DisplayName
+                           ?? sample?.AssignedAdminUser?.Email
+                           ?? (g.Key == null ? "Unassigned" : "Unknown");
+                return new ReportsWorkloadItem
+                {
+                    UserId = g.Key,
+                    Name = name,
+                    Count = g.Count()
+                };
             })
             .OrderByDescending(x => x.Count)
             .ThenBy(x => x.Name)
             .ToList();
+
+        var unassignedTickets = await _db.Tickets
+            .AsNoTracking()
+            .Include(t => t.Category)
+            .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
+            .OrderBy(t => t.CreatedAtUtc)
+            .Take(5)
+            .Select(t => new ReportsTicketItem
+            {
+                Id = t.Id,
+                Title = t.Title,
+                CreatedAtUtc = t.CreatedAtUtc,
+                Category = t.Category!.Name
+            })
+            .ToListAsync();
 
         var totalOpenCount = await _db.Tickets.CountAsync(t => t.Status != TicketStatus.Closed);
         var closedLast30Days = await _db.Tickets.CountAsync(t => t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate);
@@ -160,7 +186,13 @@ public class ReportsController : Controller
             VolumeLabels = volumeLabels,
             VolumeCreatedCounts = volumeCreated,
             VolumeClosedCounts = volumeClosed,
-            WorkloadItems = workloadItems
+            VolumeLabels14 = volumeLabels14,
+            VolumeCreatedCounts14 = volumeCreated14,
+            VolumeClosedCounts14 = volumeClosed14,
+            VolumeDateKeys = volumeDateKeys,
+            VolumeDateKeys14 = volumeDateKeys14,
+            WorkloadItems = workloadItems,
+            UnassignedTickets = unassignedTickets
         };
     }
 

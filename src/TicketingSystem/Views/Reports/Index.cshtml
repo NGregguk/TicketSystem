@@ -56,13 +56,20 @@
 <div class="row g-4 mb-4">
     <div class="col-lg-8">
         <div class="card h-100">
-            <div class="card-header section-title">Ticket Volume (Last 30 Days)</div>
-            <div class="card-body">
-                <div class="chart-wrap">
-                    <canvas id="reports-volume-chart" height="140"></canvas>
+        <div class="card-header section-title">Ticket Volume</div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div class="small text-muted">Select range</div>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Ticket volume range">
+                    <button class="btn btn-outline-secondary" type="button" data-report-volume-range="14">14 Days</button>
+                    <button class="btn btn-outline-secondary" type="button" data-report-volume-range="30">30 Days</button>
                 </div>
             </div>
+            <div class="chart-wrap">
+                <canvas id="reports-volume-chart" height="140"></canvas>
+            </div>
         </div>
+    </div>
     </div>
     <div class="col-lg-4">
         <div class="card h-100">
@@ -79,7 +86,7 @@
 <div class="row g-4">
     <div class="col-lg-7">
         <div class="card h-100">
-            <div class="card-header section-title">Workload by Admin (Open Tickets)</div>
+            <div class="card-header section-title">Workload by Assignment (Open Tickets)</div>
             <div class="card-body">
                 <div class="chart-wrap">
                     <canvas id="reports-workload-chart" height="160"></canvas>
@@ -89,27 +96,42 @@
     </div>
     <div class="col-lg-5">
         <div class="card h-100">
-            <div class="card-header section-title">Workload Breakdown</div>
+            <div class="card-header section-title">Oldest Unassigned Tickets</div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>Owner</th>
-                                <th class="text-end">Open</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in Model.WorkloadItems)
-                            {
+                @if (!Model.UnassignedTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = "All tickets are assigned",
+                        Message = "Nothing needs assignment right now."
+                    })
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
                                 <tr>
-                                    <td>@item.Name</td>
-                                    <td class="text-end">@item.Count</td>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Age</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.UnassignedTickets)
+                                {
+                                    <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                        <td class="fw-semibold">#@ticket.Id</td>
+                                        <td>@ticket.Title</td>
+                                        <td>@ticket.Category</td>
+                                        <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
         </div>
     </div>
@@ -123,20 +145,27 @@
         const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
         const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
 
-        const volumeLabels = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels));
-        const volumeCreated = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts));
-        const volumeClosed = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts));
+        const volumeLabels14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels14));
+        const volumeCreated14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts14));
+        const volumeClosed14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts14));
+        const volumeLabels30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels));
+        const volumeCreated30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts));
+        const volumeClosed30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts));
+        const volumeDateKeys14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys14));
+        const volumeDateKeys30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys));
 
         const volumeCtx = document.getElementById("reports-volume-chart");
         if (volumeCtx) {
-            new Chart(volumeCtx, {
+            const rangeButtons = document.querySelectorAll("[data-report-volume-range]");
+            let currentRange = localStorage.getItem("reportsVolumeRange") || "30";
+            const chartInstance = new Chart(volumeCtx, {
                 type: "line",
                 data: {
-                    labels: volumeLabels,
+                    labels: currentRange === "30" ? volumeLabels30 : volumeLabels14,
                     datasets: [
                         {
                             label: "Created",
-                            data: volumeCreated,
+                            data: currentRange === "30" ? volumeCreated30 : volumeCreated14,
                             borderColor: isDark ? "#6ea8c7" : "#0f4c6b",
                             backgroundColor: isDark ? "rgba(110, 168, 199, 0.2)" : "rgba(15, 76, 107, 0.15)",
                             tension: 0.3,
@@ -144,7 +173,7 @@
                         },
                         {
                             label: "Closed",
-                            data: volumeClosed,
+                            data: currentRange === "30" ? volumeClosed30 : volumeClosed14,
                             borderColor: isDark ? "#86efac" : "#16a34a",
                             backgroundColor: isDark ? "rgba(134, 239, 172, 0.18)" : "rgba(22, 163, 74, 0.12)",
                             tension: 0.3,
@@ -171,11 +200,52 @@
                     }
                 }
             });
+
+            const updateRange = (range) => {
+                currentRange = range;
+                localStorage.setItem("reportsVolumeRange", range);
+                chartInstance.data.labels = range === "30" ? volumeLabels30 : volumeLabels14;
+                chartInstance.data.datasets[0].data = range === "30" ? volumeCreated30 : volumeCreated14;
+                chartInstance.data.datasets[1].data = range === "30" ? volumeClosed30 : volumeClosed14;
+                chartInstance.update();
+                rangeButtons.forEach((button) => {
+                    const isActive = button.getAttribute("data-report-volume-range") === range;
+                    button.classList.toggle("btn-primary", isActive);
+                    button.classList.toggle("btn-outline-secondary", !isActive);
+                });
+            };
+
+            updateRange(currentRange);
+
+            rangeButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    updateRange(button.getAttribute("data-report-volume-range"));
+                });
+            });
+
+            volumeCtx.onclick = (event) => {
+                const points = chartInstance.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const point = points[0];
+                const index = point.index;
+                const datasetIndex = point.datasetIndex;
+                const isCreated = datasetIndex === 0;
+                const dateKey = currentRange === "30" ? volumeDateKeys30[index] : volumeDateKeys14[index];
+                if (!dateKey) {
+                    return;
+                }
+                const baseUrl = "@Url.Action("Index", "Tickets")";
+                const paramName = isCreated ? "createdOn" : "closedOn";
+                const target = `${baseUrl}?${paramName}=${encodeURIComponent(dateKey)}`;
+                window.location.href = target;
+            };
         }
 
         const slaCtx = document.getElementById("reports-sla-chart");
         if (slaCtx) {
-            new Chart(slaCtx, {
+            const slaChart = new Chart(slaCtx, {
                 type: "doughnut",
                 data: {
                     labels: ["On Track", "Due Soon", "Overdue"],
@@ -196,13 +266,29 @@
                     }
                 }
             });
+
+            slaCtx.onclick = (event) => {
+                const points = slaChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const index = points[0].index;
+                const slaMap = ["ontrack", "due", "overdue"];
+                const slaValue = slaMap[index];
+                if (!slaValue) {
+                    return;
+                }
+                const target = "@Url.Action("Index", "Tickets")" + `?sla=${encodeURIComponent(slaValue)}`;
+                window.location.href = target;
+            };
         }
 
         const workloadLabels = @Html.Raw(JsonSerializer.Serialize(Model.WorkloadItems.Select(x => x.Name)));
         const workloadCounts = @Html.Raw(JsonSerializer.Serialize(Model.WorkloadItems.Select(x => x.Count)));
+        const workloadUserIds = @Html.Raw(JsonSerializer.Serialize(Model.WorkloadItems.Select(x => x.UserId)));
         const workloadCtx = document.getElementById("reports-workload-chart");
         if (workloadCtx) {
-            new Chart(workloadCtx, {
+            const workloadChart = new Chart(workloadCtx, {
                 type: "bar",
                 data: {
                     labels: workloadLabels,
@@ -234,6 +320,18 @@
                     }
                 }
             });
+
+            workloadCtx.onclick = (event) => {
+                const points = workloadChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const index = points[0].index;
+                const userId = workloadUserIds[index];
+                const baseUrl = "@Url.Action("Index", "Tickets")";
+                const target = userId ? `${baseUrl}?assignedAdminUserId=${encodeURIComponent(userId)}` : `${baseUrl}?assignedAdminUserId=unassigned`;
+                window.location.href = target;
+            };
         }
     </script>
 }

@@ -41,6 +41,7 @@
                 <label class="form-label">SLA</label>
                 <select class="form-select" name="sla">
                     <option value="">All</option>
+                    <option value="ontrack" selected="@(Model.Sla == "ontrack")">On Track</option>
                     <option value="due" selected="@(Model.Sla == "due")">Due Soon</option>
                     <option value="overdue" selected="@(Model.Sla == "overdue")">Overdue</option>
                 </select>
@@ -51,6 +52,7 @@
                     <label class="form-label">Assigned</label>
                     <select class="form-select" name="assignedAdminUserId">
                         <option value="">All</option>
+                        <option value="unassigned" selected="@(Model.AssignedAdminUserId == "unassigned")">Unassigned</option>
                         @foreach (var admin in Model.Admins)
                         {
                             <option value="@admin.Value" selected="@(admin.Value == Model.AssignedAdminUserId)">@admin.Text</option>

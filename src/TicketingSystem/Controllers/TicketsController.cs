@@ -53,6 +53,8 @@ public class TicketsController : Controller
         string? assignedAdminUserId,
         string? search,
         string? sla,
+        string? createdOn,
+        string? closedOn,
         int page = 1)
     {
         var query = _db.Tickets
@@ -84,7 +86,14 @@ public class TicketsController : Controller
 
         if (!string.IsNullOrWhiteSpace(assignedAdminUserId))
         {
-            query = query.Where(t => t.AssignedAdminUserId == assignedAdminUserId);
+            if (assignedAdminUserId.Equals("unassigned", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t => t.AssignedAdminUserId == null);
+            }
+            else
+            {
+                query = query.Where(t => t.AssignedAdminUserId == assignedAdminUserId);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -111,14 +120,34 @@ public class TicketsController : Controller
                 .Where(t =>
                 {
                     var state = SlaHelper.GetSlaState(t.CreatedAtUtc, t.Priority, _slaOptions);
-                    return sla.Equals("due", StringComparison.OrdinalIgnoreCase)
-                        ? state == SlaState.DueSoon
-                        : sla.Equals("overdue", StringComparison.OrdinalIgnoreCase) && state == SlaState.Overdue;
+                    if (sla.Equals("due", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return state == SlaState.DueSoon;
+                    }
+
+                    if (sla.Equals("overdue", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return state == SlaState.Overdue;
+                    }
+
+                    return sla.Equals("ontrack", StringComparison.OrdinalIgnoreCase) && state == SlaState.OnTrack;
                 })
                 .Select(t => t.Id)
                 .ToList();
 
             query = query.Where(t => matchingIds.Contains(t.Id));
+        }
+
+        if (TryParseDate(createdOn, out var createdDateUtc))
+        {
+            var endDate = createdDateUtc.AddDays(1);
+            query = query.Where(t => t.CreatedAtUtc >= createdDateUtc && t.CreatedAtUtc < endDate);
+        }
+
+        if (TryParseDate(closedOn, out var closedDateUtc))
+        {
+            var endDate = closedDateUtc.AddDays(1);
+            query = query.Where(t => t.ClosedAtUtc != null && t.ClosedAtUtc >= closedDateUtc && t.ClosedAtUtc < endDate);
         }
 
         var totalCount = await query.CountAsync();
@@ -157,6 +186,24 @@ public class TicketsController : Controller
         };
 
         return View(viewModel);
+    }
+
+    private static bool TryParseDate(string? value, out DateTime dateUtc)
+    {
+        dateUtc = default;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (!DateTime.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+        {
+            return false;
+        }
+
+        dateUtc = DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
+        return true;
     }
 
     public async Task<IActionResult> Create()
@@ -515,6 +562,7 @@ public class TicketsController : Controller
 
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }
+
 
     [Authorize(Roles = RoleNames.Admin)]
     [HttpPost]

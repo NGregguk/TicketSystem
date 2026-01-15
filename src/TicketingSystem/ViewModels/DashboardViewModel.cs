@@ -11,9 +11,14 @@ public class DashboardViewModel
     public int DueSoonCount { get; set; }
     public int OverdueCount { get; set; }
     public int OnTrackCount { get; set; }
-    public IReadOnlyList<string> VolumeLabels { get; set; } = Array.Empty<string>();
-    public IReadOnlyList<int> VolumeCreatedCounts { get; set; } = Array.Empty<int>();
-    public IReadOnlyList<int> VolumeClosedCounts { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<string> VolumeLabels14 { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<int> VolumeCreatedCounts14 { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<int> VolumeClosedCounts14 { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<string> VolumeLabels30 { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<int> VolumeCreatedCounts30 { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<int> VolumeClosedCounts30 { get; set; } = Array.Empty<int>();
+    public IReadOnlyList<string> VolumeDateKeys14 { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> VolumeDateKeys30 { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> CategoryLabels { get; set; } = Array.Empty<string>();
     public IReadOnlyList<int> CategoryCounts { get; set; } = Array.Empty<int>();
 }
