@@ -279,6 +279,18 @@ body {
   font-size: 0.95rem;
 }
 
+.edit-link {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.edit-link:hover,
+.edit-link:focus {
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
 .opening-post {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -370,6 +382,74 @@ body {
 
 .footer {
   color: var(--muted);
+}
+
+.theme-toggle {
+  border-color: rgba(248, 250, 252, 0.6);
+  color: #f8fafc;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus {
+  background: rgba(248, 250, 252, 0.2);
+  color: #f8fafc;
+}
+
+body.dark-mode {
+  --surface: #0b1220;
+  --surface-strong: #111827;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --shadow-sm: 0 10px 20px rgba(0, 0, 0, 0.35);
+  background: radial-gradient(circle at top left, #0b1220 0%, #0f172a 45%, #0b1220 100%);
+  color: var(--text);
+}
+
+body.dark-mode .card {
+  background: var(--surface-strong);
+}
+
+body.dark-mode .table thead {
+  background: #111827;
+}
+
+body.dark-mode .table tbody tr:hover {
+  background: #0f172a;
+}
+
+body.dark-mode .comment-card,
+body.dark-mode .opening-post {
+  background: #0f172a;
+}
+
+body.dark-mode .reply-card {
+  background: #0b1220;
+}
+
+body.dark-mode .navbar .nav-link,
+body.dark-mode .navbar .navbar-brand {
+  color: #f8fafc;
+}
+
+body.dark-mode .page-header {
+  background: #0f172a;
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-color: #1f2937;
+}
+
+body.dark-mode .form-control::placeholder {
+  color: #9ca3af;
+}
+
+body.dark-mode .badge-muted {
+  background: #1f2937;
+  color: #9ca3af;
 }
 
 @media (max-width: 992px) {

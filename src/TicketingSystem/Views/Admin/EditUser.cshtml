@@ -1,0 +1,44 @@
+@model EditUserViewModel
+@{
+    ViewData["Title"] = "Edit User";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Edit User",
+        Subtitle = "Update account details and contact information.",
+        Actions = @<a class="btn btn-outline-secondary" asp-action="Users">Back to Users</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="card">
+    <div class="card-header section-title">User Details</div>
+    <div class="card-body">
+        <form asp-action="EditUser" method="post" data-disable-on-submit>
+            <input type="hidden" asp-for="UserId" />
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="UserName" class="form-label">Username</label>
+                <input asp-for="UserName" class="form-control" />
+                <span asp-validation-for="UserName" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="DisplayName" class="form-label">Display Name</label>
+                <input asp-for="DisplayName" class="form-control" />
+                <span asp-validation-for="DisplayName" class="text-danger"></span>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" data-loading-text="Saving...">Save Changes</button>
+                <a class="btn btn-outline-secondary" asp-action="Users">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

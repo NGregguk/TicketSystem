@@ -55,6 +55,16 @@ If SMTP is not configured, email is skipped with a warning log.
 }
 ```
 
+## Admin features
+- Manage users (roles, edit details, delete users if no linked tickets/comments/notes/attachments).
+- Manage categories (create, edit, deactivate).
+
+## UX features
+- Dark mode toggle in the top-right (saved to local storage).
+- Display name is preferred across the UI (falls back to email if empty).
+- Inline edit for comments and internal notes.
+- Ticket overview panel appears in the right sidebar.
+
 ## IIS deployment (Windows Server)
 1. Install IIS and the ASP.NET Core Hosting Bundle.
 2. Publish:

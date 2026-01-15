@@ -126,6 +126,82 @@ public class AdminController : Controller
         return View(viewModels);
     }
 
+    public async Task<IActionResult> EditUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var viewModel = new EditUserViewModel
+        {
+            UserId = user.Id,
+            Email = user.Email ?? string.Empty,
+            UserName = user.UserName ?? string.Empty,
+            DisplayName = user.DisplayName
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditUser(EditUserViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var user = await _userManager.FindByIdAsync(model.UserId);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        user.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim();
+
+        if (!string.Equals(user.UserName, model.UserName, StringComparison.OrdinalIgnoreCase))
+        {
+            var setUserNameResult = await _userManager.SetUserNameAsync(user, model.UserName.Trim());
+            if (!setUserNameResult.Succeeded)
+            {
+                foreach (var error in setUserNameResult.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+                return View(model);
+            }
+        }
+
+        if (!string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var setEmailResult = await _userManager.SetEmailAsync(user, model.Email.Trim());
+            if (!setEmailResult.Succeeded)
+            {
+                foreach (var error in setEmailResult.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+                return View(model);
+            }
+        }
+
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            foreach (var error in updateResult.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+            return View(model);
+        }
+
+        TempData["Success"] = "User updated.";
+        return RedirectToAction(nameof(Users));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateUserRole(string userId, string role)
@@ -141,6 +217,52 @@ public class AdminController : Controller
         await _userManager.AddToRoleAsync(user, role);
 
         TempData["Success"] = "User role updated.";
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteUser(string userId)
+    {
+        var currentUserId = _userManager.GetUserId(User);
+        if (string.Equals(currentUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["Error"] = "You cannot delete your own account.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var hasTickets = await _db.Tickets.AnyAsync(t => t.RequesterUserId == userId || t.AssignedAdminUserId == userId);
+        var hasComments = await _db.TicketComments.AnyAsync(c => c.AuthorUserId == userId);
+        var hasNotes = await _db.TicketInternalNotes.AnyAsync(n => n.AuthorUserId == userId);
+        var hasAttachments = await _db.TicketAttachments.AnyAsync(a => a.UploadedByUserId == userId);
+
+        if (hasTickets || hasComments || hasNotes || hasAttachments)
+        {
+            TempData["Error"] = "User cannot be deleted because they are linked to existing tickets, comments, notes, or attachments.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        if (roles.Any())
+        {
+            await _userManager.RemoveFromRolesAsync(user, roles);
+        }
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            TempData["Error"] = $"Failed to delete user: {errors}";
+            return RedirectToAction(nameof(Users));
+        }
+
+        TempData["Success"] = "User deleted.";
         return RedirectToAction(nameof(Users));
     }
 }

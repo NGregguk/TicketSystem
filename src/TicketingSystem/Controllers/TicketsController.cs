@@ -110,7 +110,7 @@ public class TicketsController : Controller
             Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString())),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString())),
             Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString())),
-            Admins = adminUsers.Select(u => new SelectListItem(u.Email, u.Id)),
+            Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id)),
             CategoryId = categoryId,
             Status = status,
             Priority = priority,
@@ -242,7 +242,7 @@ public class TicketsController : Controller
             Comments = ticket.Comments.OrderBy(c => c.CreatedAtUtc).ToList(),
             InternalNotes = ticket.InternalNotes.OrderByDescending(n => n.CreatedAtUtc).ToList(),
             Attachments = ticket.Attachments.OrderByDescending(a => a.UploadedAtUtc).ToList(),
-            Admins = adminUsers.Select(u => new SelectListItem(u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
+            Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status))
         };
 
@@ -293,6 +293,41 @@ public class TicketsController : Controller
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditComment(int id, int commentId, string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["Error"] = "Comment cannot be empty.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var comment = await _db.TicketComments
+            .Include(c => c.Ticket)
+            .FirstOrDefaultAsync(c => c.Id == commentId && c.TicketId == id);
+        if (comment == null)
+        {
+            return NotFound();
+        }
+
+        var currentUserId = _userManager.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!isAdmin && comment.AuthorUserId != currentUserId)
+        {
+            return Forbid();
+        }
+
+        comment.Body = body.Trim();
+        comment.Ticket!.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Comment {CommentId} updated on ticket {TicketId}", comment.Id, comment.TicketId);
+        TempData["Success"] = "Comment updated.";
+
+        return RedirectToAction(nameof(Details), new { id = comment.TicketId });
+    }
+
     [Authorize(Roles = RoleNames.Admin)]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -324,6 +359,35 @@ public class TicketsController : Controller
         _logger.LogInformation("Internal note added to ticket {TicketId}", ticket.Id);
         TempData["Success"] = "Internal note saved.";
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditInternalNote(int id, int noteId, string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["Error"] = "Internal note cannot be empty.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var note = await _db.TicketInternalNotes
+            .Include(n => n.Ticket)
+            .FirstOrDefaultAsync(n => n.Id == noteId && n.TicketId == id);
+        if (note == null)
+        {
+            return NotFound();
+        }
+
+        note.Body = body.Trim();
+        note.Ticket!.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Internal note {NoteId} updated on ticket {TicketId}", note.Id, note.TicketId);
+        TempData["Success"] = "Internal note updated.";
+
+        return RedirectToAction(nameof(Details), new { id = note.TicketId });
     }
 
     [Authorize(Roles = RoleNames.Admin)]

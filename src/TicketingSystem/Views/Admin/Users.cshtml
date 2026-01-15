@@ -1,6 +1,8 @@
 ﻿@model IReadOnlyList<UserRoleViewModel>
+@using System.Security.Claims
 @{
     ViewData["Title"] = "Manage Users";
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
     var header = new PageHeaderViewModel
     {
         Title = "Users & Roles",
@@ -27,8 +29,8 @@
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
+                        <th>User</th>
                         <th>Email</th>
-                        <th>Display Name</th>
                         <th>Role</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -37,18 +39,30 @@
                     @foreach (var user in Model)
                     {
                         <tr>
-                            <td class="fw-semibold">@user.Email</td>
-                            <td>@user.DisplayName</td>
+                            <td class="fw-semibold">@(string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName)</td>
+                            <td class="ticket-meta">@user.Email</td>
                             <td>@user.Role</td>
                             <td class="text-end">
-                                <form asp-action="UpdateUserRole" method="post" class="d-flex justify-content-end gap-2" data-disable-on-submit>
-                                    <input type="hidden" name="userId" value="@user.UserId" />
-                                    <select class="form-select form-select-sm" name="role">
-                                        <option value="Requester" selected="@(user.Role == RoleNames.Requester)">Requester</option>
-                                        <option value="Admin" selected="@(user.Role == RoleNames.Admin)">Admin</option>
-                                    </select>
-                                    <button class="btn btn-sm btn-primary" type="submit" data-loading-text="Saving...">Update</button>
-                                </form>
+                                <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                    <a class="btn btn-sm btn-outline-secondary" asp-action="EditUser" asp-route-id="@user.UserId">Edit</a>
+                                    <form asp-action="UpdateUserRole" method="post" class="d-flex gap-2" data-disable-on-submit>
+                                        <input type="hidden" name="userId" value="@user.UserId" />
+                                        <select class="form-select form-select-sm" name="role">
+                                            <option value="Requester" selected="@(user.Role == RoleNames.Requester)">Requester</option>
+                                            <option value="Admin" selected="@(user.Role == RoleNames.Admin)">Admin</option>
+                                        </select>
+                                        <button class="btn btn-sm btn-primary" type="submit" data-loading-text="Saving...">Update</button>
+                                    </form>
+                                    <form asp-action="DeleteUser" method="post" data-disable-on-submit>
+                                        <input type="hidden" name="userId" value="@user.UserId" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit"
+                                                data-loading-text="Deleting..."
+                                                disabled="@(user.UserId == currentUserId)"
+                                                onclick="return confirm('Delete this user? This cannot be undone.');">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     }

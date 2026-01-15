@@ -1,11 +1,19 @@
 ﻿@using Microsoft.AspNetCore.Identity
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+
+@{
+    var currentUser = SignInManager.IsSignedIn(User) ? await UserManager.GetUserAsync(User) : null;
+    var displayName = string.IsNullOrWhiteSpace(currentUser?.DisplayName)
+        ? currentUser?.Email
+        : currentUser?.DisplayName;
+}
 
 <ul class="navbar-nav align-items-lg-center">
 @if (SignInManager.IsSignedIn(User))
 {
     <li class="nav-item">
-        <span class="nav-link user-chip">@User.Identity?.Name</span>
+        <span class="nav-link user-chip">@displayName</span>
     </li>
     <li class="nav-item">
         <form class="d-inline" asp-area="Identity" asp-page="/Account/Logout" method="post">
