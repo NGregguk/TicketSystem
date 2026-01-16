@@ -86,3 +86,4 @@ Migrations are included in `src/TicketingSystem/Migrations`.
 - Logs are written to console and `logs/log-*.txt`.
 - Attachment uploads are stored on disk; metadata is stored in SQL Server.
 - Reopened tickets are tracked with a reopen count and last reopened timestamp.
+- SLA calculations use business hours (Mon–Fri 08:30–17:30, Europe/London).

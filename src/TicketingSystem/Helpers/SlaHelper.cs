@@ -1,5 +1,6 @@
 using TicketingSystem.Models;
 using TicketingSystem.Options;
+using TicketingSystem.Services;
 
 namespace TicketingSystem.Helpers;
 
@@ -14,13 +15,8 @@ public static class SlaHelper
 {
     public static double GetAgeHours(DateTime createdAtUtc, DateTime nowUtc)
     {
-        var span = nowUtc - createdAtUtc;
-        if (span < TimeSpan.Zero)
-        {
-            return 0;
-        }
-
-        return span.TotalHours;
+        var minutes = BusinessTimeCalculator.Default.GetWorkingMinutesElapsed(createdAtUtc, nowUtc);
+        return minutes / 60d;
     }
 
     public static string FormatAge(DateTime createdAtUtc, DateTime nowUtc)
@@ -47,19 +43,20 @@ public static class SlaHelper
 
     public static SlaState GetSlaState(DateTime createdAtUtc, TicketPriority priority, SlaOptions options)
     {
-        var threshold = options.GetThresholdHours(priority);
-        if (threshold <= 0)
+        var thresholdHours = options.GetThresholdHours(priority);
+        if (thresholdHours <= 0)
         {
             return SlaState.OnTrack;
         }
 
-        var ageHours = GetAgeHours(createdAtUtc, DateTime.UtcNow);
-        if (ageHours >= threshold)
+        var thresholdMinutes = (int)Math.Round(thresholdHours * 60d);
+        var elapsedMinutes = BusinessTimeCalculator.Default.GetWorkingMinutesElapsed(createdAtUtc, DateTime.UtcNow);
+        if (elapsedMinutes >= thresholdMinutes)
         {
             return SlaState.Overdue;
         }
 
-        if (ageHours >= threshold * 0.75)
+        if (elapsedMinutes >= thresholdMinutes * 0.75)
         {
             return SlaState.DueSoon;
         }

@@ -30,9 +30,27 @@
                     }
                 </ul>
                 <div class="d-flex align-items-center gap-3">
-                    <button class="btn btn-sm btn-outline-light theme-toggle" type="button" id="theme-toggle" aria-pressed="false">
-                        Dark Mode
-                    </button>
+                    <label class="theme-switch" aria-label="Toggle dark mode">
+                        <input type="checkbox" id="theme-toggle" />
+                        <span class="theme-switch-slider">
+                            <span class="theme-switch-icons">
+                                <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <circle cx="12" cy="12" r="4.5"></circle>
+                                    <line x1="12" y1="2" x2="12" y2="5"></line>
+                                    <line x1="12" y1="19" x2="12" y2="22"></line>
+                                    <line x1="2" y1="12" x2="5" y2="12"></line>
+                                    <line x1="19" y1="12" x2="22" y2="12"></line>
+                                    <line x1="4.2" y1="4.2" x2="6.4" y2="6.4"></line>
+                                    <line x1="17.6" y1="17.6" x2="19.8" y2="19.8"></line>
+                                    <line x1="4.2" y1="19.8" x2="6.4" y2="17.6"></line>
+                                    <line x1="17.6" y1="6.4" x2="19.8" y2="4.2"></line>
+                                </svg>
+                                <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 1 0 11.5 11.5z"></path>
+                                </svg>
+                            </span>
+                        </span>
+                    </label>
                     <partial name="_LoginPartial" />
                 </div>
             </div>
@@ -89,17 +107,15 @@
         if (storedTheme === "dark") {
             document.body.classList.add("dark-mode");
             if (themeToggle) {
-                themeToggle.setAttribute("aria-pressed", "true");
-                themeToggle.textContent = "Light Mode";
+                themeToggle.checked = true;
             }
         }
 
         if (themeToggle) {
-            themeToggle.addEventListener("click", () => {
-                const isDark = document.body.classList.toggle("dark-mode");
+            themeToggle.addEventListener("change", () => {
+                const isDark = themeToggle.checked;
+                document.body.classList.toggle("dark-mode", isDark);
                 localStorage.setItem("theme", isDark ? "dark" : "light");
-                themeToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
-                themeToggle.textContent = isDark ? "Light Mode" : "Dark Mode";
             });
         }
 

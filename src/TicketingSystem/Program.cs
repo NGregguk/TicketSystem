@@ -53,6 +53,7 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IFileStorage, FileSystemStorage>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddSingleton(new BusinessTimeCalculator(WorkSchedule.CreateDefault()));
 
 var app = builder.Build();
 
