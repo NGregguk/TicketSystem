@@ -150,22 +150,10 @@ public class AttachmentsController : Controller
         }
 
         var userId = _userManager.GetUserId(User) ?? string.Empty;
-        if (attachment.TicketId.HasValue)
+        if (!attachment.TicketId.HasValue &&
+            !string.Equals(attachment.UploadedByUserId, userId, StringComparison.OrdinalIgnoreCase))
         {
-            if (!User.IsInRole(RoleNames.Admin))
-            {
-                if (attachment.Ticket?.RequesterUserId != userId)
-                {
-                    return Forbid();
-                }
-            }
-        }
-        else
-        {
-            if (!string.Equals(attachment.UploadedByUserId, userId, StringComparison.OrdinalIgnoreCase))
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         var root = Path.IsPathRooted(_uploadOptions.RootPath)

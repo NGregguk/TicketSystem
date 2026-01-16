@@ -25,6 +25,7 @@ public class DashboardService
         var startDate = nowUtc.Date.AddDays(-29);
 
         var scopedTickets = ApplyScope(_db.Tickets.AsNoTracking(), user);
+        var showGlobal = user.CanViewAll;
 
         var statusCounts = await scopedTickets
             .GroupBy(t => t.Status)
@@ -32,7 +33,7 @@ public class DashboardService
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
         var unassignedCount = 0;
-        if (user.IsAdmin)
+        if (showGlobal)
         {
             unassignedCount = await scopedTickets
                 .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
@@ -40,7 +41,7 @@ public class DashboardService
         }
 
         var statusCards = new List<DashboardMetricCard>();
-        if (user.IsAdmin)
+        if (showGlobal)
         {
             statusCards.Add(BuildCard("unassigned", "Unassigned", unassignedCount, "?assignedAdminUserId=unassigned"));
         }
@@ -162,36 +163,24 @@ public class DashboardService
         }
         else
         {
-            var requesterCandidates = await scopedTickets
+            needsAttentionTickets = await _db.Tickets
+                .AsNoTracking()
                 .Include(t => t.Category)
-                .Where(t => t.Status != TicketStatus.Closed)
+                .Where(t => t.RequesterUserId == user.UserId)
+                .Where(t => t.Status == TicketStatus.WaitingOnUser)
                 .OrderByDescending(t => t.UpdatedAtUtc)
-                .Take(20)
-                .ToListAsync();
-
-            needsAttentionTickets = requesterCandidates
-                .Where(t =>
-                {
-                    if (t.Status == TicketStatus.WaitingOnUser)
-                    {
-                        return true;
-                    }
-
-                    var state = SlaHelper.GetSlaState(t.CreatedAtUtc, t.Priority, _slaOptions);
-                    return state == SlaState.DueSoon || state == SlaState.Overdue;
-                })
                 .Take(5)
-                .ToList();
+                .ToListAsync();
         }
 
         return new DashboardViewModel
         {
             IsAdmin = user.IsAdmin,
             Title = "Dashboard",
-            Subtitle = user.IsAdmin
+            Subtitle = showGlobal
                 ? "A quick view of ticket health and what needs attention."
                 : "A quick view of your ticket health and updates.",
-            ScopeNote = user.IsAdmin ? null : "Showing your tickets only.",
+            ScopeNote = showGlobal ? null : "Showing your tickets only.",
             StatusCards = statusCards,
             SlaCards = slaCards,
             MyOpenTicketsTitle = user.IsAdmin ? "My Open Tickets" : "Your Open Tickets",
@@ -243,7 +232,7 @@ public class DashboardService
     // All dashboard metrics must use ApplyScope(user) to avoid leaking data between roles.
     private static IQueryable<Ticket> ApplyScope(IQueryable<Ticket> query, DashboardUserContext user)
     {
-        return user.IsAdmin ? query : query.Where(t => t.RequesterUserId == user.UserId);
+        return user.CanViewAll ? query : query.Where(t => t.RequesterUserId == user.UserId);
     }
 
     private static DashboardMetricCard BuildCard(string key, string label, int count, string filterQueryString)
@@ -262,4 +251,5 @@ public class DashboardUserContext
 {
     public string UserId { get; init; } = string.Empty;
     public bool IsAdmin { get; init; }
+    public bool CanViewAll { get; init; }
 }

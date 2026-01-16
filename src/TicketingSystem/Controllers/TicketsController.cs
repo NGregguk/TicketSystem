@@ -53,6 +53,7 @@ public class TicketsController : Controller
         TicketStatus? status,
         TicketPriority? priority,
         string? assignedAdminUserId,
+        string? requesterUserId,
         string? search,
         string? sla,
         string? createdOn,
@@ -70,12 +71,6 @@ public class TicketsController : Controller
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
             .AsQueryable();
-
-        if (!User.IsInRole(RoleNames.Admin))
-        {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            query = query.Where(t => t.RequesterUserId == userId);
-        }
 
         if (categoryId.HasValue)
         {
@@ -107,6 +102,11 @@ public class TicketsController : Controller
             {
                 query = query.Where(t => t.AssignedAdminUserId == assignedAdminUserId);
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(requesterUserId))
+        {
+            query = query.Where(t => t.RequesterUserId == requesterUserId);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -179,17 +179,14 @@ public class TicketsController : Controller
             .OrderBy(c => c.Name)
             .ToListAsync();
 
-        var internalSystemsQuery = _db.InternalSystems.AsQueryable();
-        if (!User.IsInRole(RoleNames.Admin))
-        {
-            internalSystemsQuery = internalSystemsQuery.Where(s => s.IsActive);
-        }
-
-        var internalSystems = await internalSystemsQuery
+        var internalSystems = await _db.InternalSystems
             .OrderBy(s => s.Name)
             .ToListAsync();
 
         var adminUsers = await _userManager.GetUsersInRoleAsync(RoleNames.Admin);
+        var requesterUsers = await _db.Users
+            .OrderBy(u => u.DisplayName ?? u.Email ?? u.UserName)
+            .ToListAsync();
 
         var viewModel = new TicketListViewModel
         {
@@ -199,11 +196,13 @@ public class TicketsController : Controller
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString())),
             Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString())),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id)),
+            Requesters = requesterUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email ?? u.UserName ?? u.Id, u.Id)),
             CategoryId = categoryId,
             InternalSystemId = internalSystemId,
             Status = status,
             Priority = priority,
             AssignedAdminUserId = assignedAdminUserId,
+            RequesterUserId = requesterUserId,
             Search = search,
             Sla = sla,
             Page = page,
@@ -355,28 +354,13 @@ public class TicketsController : Controller
             return NotFound();
         }
 
-        if (!User.IsInRole(RoleNames.Admin))
-        {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            if (ticket.RequesterUserId != userId)
-            {
-                return Forbid();
-            }
-        }
-
         var adminUsers = await _userManager.GetUsersInRoleAsync(RoleNames.Admin);
         var categories = await _db.Categories
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
             .ToListAsync();
 
-        var internalSystemsQuery = _db.InternalSystems.AsQueryable();
-        if (!User.IsInRole(RoleNames.Admin))
-        {
-            internalSystemsQuery = internalSystemsQuery.Where(s => s.IsActive);
-        }
-
-        var internalSystems = await internalSystemsQuery
+        var internalSystems = await _db.InternalSystems
             .OrderBy(s => s.Name)
             .ToListAsync();
 
@@ -412,19 +396,16 @@ public class TicketsController : Controller
             return NotFound();
         }
 
-        if (!User.IsInRole(RoleNames.Admin))
+        var userId = _userManager.GetUserId(User) ?? string.Empty;
+        if (!User.IsInRole(RoleNames.Admin) && ticket.RequesterUserId != userId)
         {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            if (ticket.RequesterUserId != userId)
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         var comment = new TicketComment
         {
             TicketId = ticket.Id,
-            AuthorUserId = _userManager.GetUserId(User) ?? string.Empty,
+            AuthorUserId = userId,
             Body = model.NewComment.Trim(),
             CreatedAtUtc = DateTime.UtcNow,
             IsPublic = true
@@ -676,13 +657,10 @@ public class TicketsController : Controller
             return NotFound();
         }
 
-        if (!User.IsInRole(RoleNames.Admin))
+        var userId = _userManager.GetUserId(User) ?? string.Empty;
+        if (!User.IsInRole(RoleNames.Admin) && ticket.RequesterUserId != userId)
         {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            if (ticket.RequesterUserId != userId)
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         var oldStatus = ticket.Status;
@@ -751,13 +729,10 @@ public class TicketsController : Controller
             return NotFound();
         }
 
-        if (!User.IsInRole(RoleNames.Admin))
+        var userId = _userManager.GetUserId(User) ?? string.Empty;
+        if (!User.IsInRole(RoleNames.Admin) && ticket.RequesterUserId != userId)
         {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            if (ticket.RequesterUserId != userId)
-            {
-                return Forbid();
-            }
+            return Forbid();
         }
 
         if (!_fileStorage.IsAllowed(attachment, out var error))
@@ -775,7 +750,7 @@ public class TicketsController : Controller
             ContentType = attachment.ContentType,
             SizeBytes = attachment.Length,
             UploadedAtUtc = DateTime.UtcNow,
-            UploadedByUserId = _userManager.GetUserId(User) ?? string.Empty
+            UploadedByUserId = userId
         };
 
         _db.TicketAttachments.Add(attachmentEntity);
@@ -795,15 +770,6 @@ public class TicketsController : Controller
         if (ticket == null)
         {
             return NotFound();
-        }
-
-        if (!User.IsInRole(RoleNames.Admin))
-        {
-            var userId = _userManager.GetUserId(User) ?? string.Empty;
-            if (ticket.RequesterUserId != userId)
-            {
-                return Forbid();
-            }
         }
 
         var attachment = await _db.TicketAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.TicketId == id);

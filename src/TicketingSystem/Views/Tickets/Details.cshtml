@@ -4,6 +4,8 @@
     var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
     var isAdmin = User.IsInRole(RoleNames.Admin);
     var isRequester = Model.Ticket.RequesterUserId == currentUserId;
+    var canInteract = isAdmin || isRequester;
+    var roleLabel = isAdmin ? "admin" : "requester";
     var header = new PageHeaderViewModel
     {
         Title = $"#{Model.Ticket.Id} {Model.Ticket.Title}",
@@ -32,10 +34,10 @@
 
 @await Html.PartialAsync("_PageHeader", header)
 
-<div class="row g-4">
-    <div class="col-lg-8">
+<div class="ticket-layout" data-role="@roleLabel">
+    <div class="ticket-main">
         <div class="card mb-4">
-            <div class="card-header section-title">Conversation</div>
+            <div class="card-header section-title ticket-conversation-header">Conversation</div>
             <div class="card-body">
                 <div class="opening-post">
                     <div class="conversation-header">
@@ -107,19 +109,22 @@
                     }
                 </div>
 
-                <form asp-action="AddComment" method="post" class="mt-3" data-disable-on-submit>
-                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                    <div class="mb-3">
-                        <label class="form-label">Add Reply</label>
-                        <textarea class="form-control" name="NewComment" rows="4" placeholder="Share updates or ask for details" required id="reply-text"></textarea>
-                        <div class="form-text">Tip: paste screenshots here (Ctrl+V).</div>
-                        <div class="paste-preview mt-2" id="reply-paste-preview"></div>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary" type="submit" data-loading-text="Posting...">Post Reply</button>
-                        <button class="btn btn-outline-secondary" type="reset">Clear</button>
-                    </div>
-                </form>
+                @if (canInteract)
+                {
+                    <form asp-action="AddComment" method="post" class="mt-3" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <div class="mb-3">
+                            <label class="form-label">Add Reply</label>
+                            <textarea class="form-control" name="NewComment" rows="4" placeholder="Share updates or ask for details" required id="reply-text"></textarea>
+                            <div class="form-text">Tip: paste screenshots here (Ctrl+V).</div>
+                            <div class="paste-preview mt-2" id="reply-paste-preview"></div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" type="submit" data-loading-text="Posting...">Post Reply</button>
+                            <button class="btn btn-outline-secondary" type="reset">Clear</button>
+                        </div>
+                    </form>
+                }
             </div>
         </div>
 
@@ -153,91 +158,102 @@
                     </ul>
                 }
 
-                <form asp-action="UploadAttachment" method="post" enctype="multipart/form-data" data-disable-on-submit>
-                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                    <div class="mb-3">
-                        <label class="form-label">Upload Attachment</label>
-                        <input type="file" name="attachment" class="form-control" />
-                        <div class="form-text">Allowed: pdf, png, jpg, txt, docx, xlsx (max 10MB).</div>
-                    </div>
-                    <button class="btn btn-outline-primary" type="submit" data-loading-text="Uploading...">Upload</button>
-                </form>
+                @if (canInteract)
+                {
+                    <form asp-action="UploadAttachment" method="post" enctype="multipart/form-data" data-disable-on-submit>
+                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                        <div class="mb-3">
+                            <label class="form-label">Upload Attachment</label>
+                            <input type="file" name="attachment" class="form-control" />
+                            <div class="form-text">Allowed: pdf, png, jpg, txt, docx, xlsx (max 10MB).</div>
+                        </div>
+                        <button class="btn btn-outline-primary" type="submit" data-loading-text="Uploading...">Upload</button>
+                    </form>
+                }
             </div>
         </div>
     </div>
+    <div class="ticket-sidebar" id="ticket-sidebar" aria-hidden="false">
+        <div class="ticket-sidebar-header">
+            <span class="section-title">Ticket Panel</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary ticket-sidebar-toggle" aria-expanded="true" aria-controls="ticket-sidebar">
+                Hide panel
+            </button>
+        </div>
+        <div class="ticket-sidebar-body">
+            @if (User.IsInRole(RoleNames.Admin))
+            {
+                <details class="ticket-panel mb-3" open>
+                    <summary class="ticket-panel-summary">Admin Actions</summary>
+                    <div class="ticket-panel-content">
+                        <form asp-action="Assign" method="post" class="mb-3" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <label class="form-label">Assign Ticket</label>
+                            <select class="form-select" name="AssignToUserId">
+                                <option value="">Unassigned</option>
+                                @foreach (var admin in Model.Admins)
+                                {
+                                    <option value="@admin.Value" selected="@(admin.Value == Model.Ticket.AssignedAdminUserId)">@admin.Text</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary mt-2" type="submit" data-loading-text="Saving...">Update Assignment</button>
+                        </form>
 
-    <div class="col-lg-4">
-        @if (User.IsInRole(RoleNames.Admin))
-        {
-            <div class="card mb-4">
-                <div class="card-header section-title">Admin Actions</div>
-                <div class="card-body">
-                    <form asp-action="Assign" method="post" class="mb-3" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <label class="form-label">Assign Ticket</label>
-                        <select class="form-select" name="AssignToUserId">
-                            <option value="">Unassigned</option>
-                            @foreach (var admin in Model.Admins)
-                            {
-                                <option value="@admin.Value" selected="@(admin.Value == Model.Ticket.AssignedAdminUserId)">@admin.Text</option>
-                            }
-                        </select>
-                        <button class="btn btn-primary mt-2" type="submit" data-loading-text="Saving...">Update Assignment</button>
-                    </form>
+                        <form asp-action="UpdateStatus" method="post" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <label class="form-label">Update Status</label>
+                            <select class="form-select" name="NewStatus">
+                                @foreach (var status in Model.Statuses)
+                                {
+                                    <option value="@status.Value" selected="@(status.Value == Model.Ticket.Status.ToString())">@status.Text</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Status</button>
+                        </form>
 
-                    <form asp-action="UpdateStatus" method="post" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <label class="form-label">Update Status</label>
-                        <select class="form-select" name="NewStatus">
-                            @foreach (var status in Model.Statuses)
-                            {
-                                <option value="@status.Value" selected="@(status.Value == Model.Ticket.Status.ToString())">@status.Text</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Status</button>
-                    </form>
+                        <form asp-action="UpdatePriority" method="post" class="mt-3" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <label class="form-label">Update Priority</label>
+                            <select class="form-select" name="NewPriority">
+                                @foreach (var priority in Model.Priorities)
+                                {
+                                    <option value="@priority.Value" selected="@(priority.Value == Model.Ticket.Priority.ToString())">@priority.Text</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Priority</button>
+                        </form>
 
-                    <form asp-action="UpdatePriority" method="post" class="mt-3" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <label class="form-label">Update Priority</label>
-                        <select class="form-select" name="NewPriority">
-                            @foreach (var priority in Model.Priorities)
-                            {
-                                <option value="@priority.Value" selected="@(priority.Value == Model.Ticket.Priority.ToString())">@priority.Text</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Priority</button>
-                    </form>
+                        <form asp-action="UpdateCategory" method="post" class="mt-3" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <label class="form-label">Update Category</label>
+                            <select class="form-select" name="NewCategoryId">
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.Value" selected="@(category.Value == Model.Ticket.CategoryId.ToString())">@category.Text</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Category</button>
+                        </form>
 
-                    <form asp-action="UpdateCategory" method="post" class="mt-3" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <label class="form-label">Update Category</label>
-                        <select class="form-select" name="NewCategoryId">
-                            @foreach (var category in Model.Categories)
-                            {
-                                <option value="@category.Value" selected="@(category.Value == Model.Ticket.CategoryId.ToString())">@category.Text</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change Category</button>
-                    </form>
+                        <form asp-action="UpdateInternalSystem" method="post" class="mt-3" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <label class="form-label">Update Internal System</label>
+                            <select class="form-select" name="NewInternalSystemId">
+                                <option value="" selected="@(Model.Ticket.InternalSystemId == null)">Not set</option>
+                                @foreach (var system in Model.InternalSystems)
+                                {
+                                    <option value="@system.Value" selected="@(system.Value == Model.Ticket.InternalSystemId?.ToString())">@system.Text</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change System</button>
+                        </form>
+                    </div>
+                </details>
+            }
 
-                    <form asp-action="UpdateInternalSystem" method="post" class="mt-3" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <label class="form-label">Update Internal System</label>
-                        <select class="form-select" name="NewInternalSystemId">
-                            <option value="" selected="@(Model.Ticket.InternalSystemId == null)">Not set</option>
-                            @foreach (var system in Model.InternalSystems)
-                            {
-                                <option value="@system.Value" selected="@(system.Value == Model.Ticket.InternalSystemId?.ToString())">@system.Text</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-primary mt-2" type="submit" data-loading-text="Updating...">Change System</button>
-                    </form>
-                </div>
-            </div>
-            <div class="card mb-4">
-                <div class="card-header section-title">Ticket Overview</div>
-                <div class="card-body">
+            <details class="ticket-panel mb-3" open>
+                <summary class="ticket-panel-summary">Ticket Overview</summary>
+                <div class="ticket-panel-content">
                     <div class="info-grid">
                         <div>
                             <div class="info-label">Requester</div>
@@ -290,160 +306,87 @@
                     </div>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <div class="card mb-4 note-card">
-                <div class="card-header section-title">Internal Notes</div>
-                <div class="card-body">
-                    @if (!Model.InternalNotes.Any())
-                    {
-                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+            @if (User.IsInRole(RoleNames.Admin))
+            {
+                <details class="ticket-panel note-card" open>
+                    <summary class="ticket-panel-summary">Internal Notes</summary>
+                    <div class="ticket-panel-content">
+                        @if (!Model.InternalNotes.Any())
                         {
-                            Title = "No internal notes",
-                            Message = "Admin-only notes stay hidden from requesters."
-                        })
-                    }
-                    else
-                    {
-                        <div class="comment-timeline">
-                            @foreach (var note in Model.InternalNotes)
+                            @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
                             {
-                                <div class="comment-card note-card-item">
-                                    <div class="comment-header">
-                                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(note.AuthorUser?.DisplayName) ? note.AuthorUser?.Email : note.AuthorUser?.DisplayName)</div>
-                                        <div class="ticket-meta">@note.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
-                                    </div>
-                                    <div class="comment-body">@Html.Raw(TicketBodyRenderer.RenderTicketBody(note.Body, Model.AllowedAttachmentIds))</div>
-                                    <div class="mt-2">
-                                        <button class="btn btn-link btn-sm p-0 edit-link" type="button"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#edit-note-@note.Id"
-                                                aria-expanded="false"
-                                                aria-controls="edit-note-@note.Id">
-                                            Edit
-                                        </button>
-                                    </div>
-                                    <div class="collapse mt-3" id="edit-note-@note.Id">
-                                        <form asp-action="EditInternalNote" method="post" data-disable-on-submit>
-                                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                                            <input type="hidden" name="noteId" value="@note.Id" />
-                                            <div class="mb-2">
-                                                <label class="form-label">Edit Internal Note</label>
-                                                <textarea class="form-control" name="body" rows="3">@note.Body</textarea>
-                                            </div>
-                                            <div class="d-flex gap-2">
-                                                <button class="btn btn-sm btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Changes</button>
-                                                <button class="btn btn-sm btn-light" type="button"
-                                                        data-bs-toggle="collapse"
-                                                        data-bs-target="#edit-note-@note.Id"
-                                                        aria-expanded="true"
-                                                        aria-controls="edit-note-@note.Id">
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                    }
-
-                    <form asp-action="AddInternalNote" method="post" class="mt-3" data-disable-on-submit>
-                        <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                        <div class="mb-3">
-                            <label class="form-label">Add Internal Note</label>
-                            <textarea class="form-control" name="NewInternalNote" rows="3" placeholder="Add internal-only notes" id="note-text"></textarea>
-                            <div class="form-text">Tip: paste screenshots here (Ctrl+V).</div>
-                            <div class="paste-preview mt-2" id="note-paste-preview"></div>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Note</button>
-                            <button class="btn btn-light" type="reset">Clear</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        }
-        else
-        {
-            <div class="card">
-                <div class="card-header section-title">Actions</div>
-                <div class="card-body">
-                    @if (Model.Ticket.Status != TicketStatus.Closed)
-                    {
-                        <form asp-action="Close" method="post" data-disable-on-submit>
-                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                            <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." data-confirm="Close this ticket?">Close Ticket</button>
-                        </form>
-                    }
-                    else if (isRequester)
-                    {
-                        <form asp-action="Reopen" method="post" data-disable-on-submit>
-                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
-                            <button class="btn btn-outline-secondary" type="submit" data-loading-text="Reopening..." data-confirm="Reopen this ticket?">Reopen Ticket</button>
-                        </form>
-                    }
-                </div>
-            </div>
-            <div class="card mt-4">
-                <div class="card-header section-title">Ticket Overview</div>
-                <div class="card-body">
-                    <div class="info-grid">
-                        <div>
-                            <div class="info-label">Requester</div>
-                            <div>@(string.IsNullOrWhiteSpace(Model.Ticket.RequesterUser?.DisplayName) ? Model.Ticket.RequesterUser?.Email : Model.Ticket.RequesterUser?.DisplayName)</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Category</div>
-                            <div>@Model.Ticket.Category?.Name</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Internal System</div>
-                            <div>@(Model.Ticket.InternalSystem?.Name ?? "Not set")</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Assigned</div>
-                            <div>@(string.IsNullOrWhiteSpace(Model.Ticket.AssignedAdminUser?.DisplayName) ? (Model.Ticket.AssignedAdminUser?.Email ?? "Unassigned") : Model.Ticket.AssignedAdminUser?.DisplayName)</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Created</div>
-                            <div>@Model.Ticket.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Updated</div>
-                            <div>@Model.Ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
-                        </div>
-                        <div>
-                            <div class="info-label">Reopens</div>
-                            <div>@Model.Ticket.ReopenCount</div>
-                        </div>
-                        @if (Model.Ticket.ReopenedAtUtc.HasValue)
+                                Title = "No internal notes",
+                                Message = "Admin-only notes stay hidden from requesters."
+                            })
+                        }
+                        else
                         {
-                            <div>
-                                <div class="info-label">Last Reopened</div>
-                                <div>@Model.Ticket.ReopenedAtUtc.Value.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                            <div class="comment-timeline">
+                                @foreach (var note in Model.InternalNotes)
+                                {
+                                    <div class="comment-card note-card-item">
+                                        <div class="comment-header">
+                                            <div class="fw-semibold">@(string.IsNullOrWhiteSpace(note.AuthorUser?.DisplayName) ? note.AuthorUser?.Email : note.AuthorUser?.DisplayName)</div>
+                                            <div class="ticket-meta">@note.CreatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                                        </div>
+                                        <div class="comment-body">@Html.Raw(TicketBodyRenderer.RenderTicketBody(note.Body, Model.AllowedAttachmentIds))</div>
+                                        <div class="mt-2">
+                                            <button class="btn btn-link btn-sm p-0 edit-link" type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#edit-note-@note.Id"
+                                                    aria-expanded="false"
+                                                    aria-controls="edit-note-@note.Id">
+                                                Edit
+                                            </button>
+                                        </div>
+                                        <div class="collapse mt-3" id="edit-note-@note.Id">
+                                            <form asp-action="EditInternalNote" method="post" data-disable-on-submit>
+                                                <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                                                <input type="hidden" name="noteId" value="@note.Id" />
+                                                <div class="mb-2">
+                                                    <label class="form-label">Edit Internal Note</label>
+                                                    <textarea class="form-control" name="body" rows="3">@note.Body</textarea>
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-sm btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Changes</button>
+                                                    <button class="btn btn-sm btn-light" type="button"
+                                                            data-bs-toggle="collapse"
+                                                            data-bs-target="#edit-note-@note.Id"
+                                                            aria-expanded="true"
+                                                            aria-controls="edit-note-@note.Id">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         }
-                    <div>
-                        <div class="info-label">Status</div>
-                        <div class="d-flex gap-2 flex-wrap">
-                            @await Html.PartialAsync("_BadgeStatus", Model.Ticket.Status)
-                            @await Html.PartialAsync("_BadgePriority", Model.Ticket.Priority)
-                        </div>
-                    </div>
-                    <div>
-                        <div class="info-label">Open For</div>
-                        <div class="d-flex gap-2 flex-wrap align-items-center">
-                            <span>@SlaHelper.FormatAge(Model.Ticket.CreatedAtUtc, DateTime.UtcNow)</span>
-                            @await Html.PartialAsync("_SlaBadge", Model.Ticket)
-                        </div>
-                    </div>
-                    </div>
-                </div>
-            </div>
 
-        }
+                        <form asp-action="AddInternalNote" method="post" class="mt-3" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <div class="mb-3">
+                                <label class="form-label">Add Internal Note</label>
+                                <textarea class="form-control" name="NewInternalNote" rows="3" placeholder="Add internal-only notes" id="note-text"></textarea>
+                                <div class="form-text">Tip: paste screenshots here (Ctrl+V).</div>
+                                <div class="paste-preview mt-2" id="note-paste-preview"></div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Note</button>
+                                <button class="btn btn-light" type="reset">Clear</button>
+                            </div>
+                        </form>
+                    </div>
+                </details>
+            }
+        </div>
     </div>
+    <button type="button" class="ticket-sidebar-handle" id="ticket-sidebar-handle" aria-controls="ticket-sidebar" aria-expanded="false">
+        Panel
+    </button>
 </div>
 
 @section Scripts {
@@ -470,4 +413,41 @@
             uploadUrl: "@Url.Action("UploadToTicket", "Attachments", new { ticketId = Model.Ticket.Id })"
         });
     </script>
+    <script>
+        const layout = document.querySelector(".ticket-layout");
+        const sidebar = document.getElementById("ticket-sidebar");
+        const toggle = document.querySelector(".ticket-sidebar-toggle");
+        const handle = document.getElementById("ticket-sidebar-handle");
+        const storageKey = "ticketSidebarCollapsed";
+
+        const setCollapsed = (collapsed) => {
+            if (!layout || !sidebar || !toggle || !handle) {
+                return;
+            }
+            layout.classList.toggle("is-collapsed", collapsed);
+            layout.classList.toggle("is-open", !collapsed);
+            toggle.setAttribute("aria-expanded", (!collapsed).toString());
+            handle.setAttribute("aria-expanded", (!collapsed).toString());
+            toggle.textContent = collapsed ? "Show panel" : "Hide panel";
+            sidebar.setAttribute("aria-hidden", collapsed.toString());
+            localStorage.setItem(storageKey, collapsed ? "true" : "false");
+        };
+
+        if (layout && sidebar && toggle && handle) {
+            const isMobile = window.matchMedia("(max-width: 991px)").matches;
+            const stored = localStorage.getItem(storageKey);
+            const defaultCollapsed = isMobile ? true : layout.dataset.role !== "admin";
+            const collapsed = stored === null ? defaultCollapsed : stored === "true";
+            setCollapsed(collapsed);
+
+            toggle.addEventListener("click", () => {
+                setCollapsed(!layout.classList.contains("is-collapsed"));
+            });
+
+            handle.addEventListener("click", () => {
+                setCollapsed(!layout.classList.contains("is-collapsed"));
+            });
+        }
+    </script>
 }
+

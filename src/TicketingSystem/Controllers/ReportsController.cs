@@ -11,7 +11,7 @@ using TicketingSystem.ViewModels;
 
 namespace TicketingSystem.Controllers;
 
-[Authorize(Roles = RoleNames.Admin)]
+[Authorize]
 public class ReportsController : Controller
 {
     private readonly ApplicationDbContext _db;

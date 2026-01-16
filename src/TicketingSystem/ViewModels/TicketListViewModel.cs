@@ -11,12 +11,14 @@ public class TicketListViewModel
     public IEnumerable<SelectListItem> Statuses { get; set; } = Array.Empty<SelectListItem>();
     public IEnumerable<SelectListItem> Priorities { get; set; } = Array.Empty<SelectListItem>();
     public IEnumerable<SelectListItem> Admins { get; set; } = Array.Empty<SelectListItem>();
+    public IEnumerable<SelectListItem> Requesters { get; set; } = Array.Empty<SelectListItem>();
 
     public int? CategoryId { get; set; }
     public int? InternalSystemId { get; set; }
     public TicketStatus? Status { get; set; }
     public TicketPriority? Priority { get; set; }
     public string? AssignedAdminUserId { get; set; }
+    public string? RequesterUserId { get; set; }
     public string? Search { get; set; }
     public string? Sla { get; set; }
 
