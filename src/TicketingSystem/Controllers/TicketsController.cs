@@ -620,6 +620,44 @@ public class TicketsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reopen(int id)
+    {
+        var ticket = await _db.Tickets.FindAsync(id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        var userId = _userManager.GetUserId(User) ?? string.Empty;
+        if (!User.IsInRole(RoleNames.Admin) && ticket.RequesterUserId != userId)
+        {
+            return Forbid();
+        }
+
+        if (ticket.Status != TicketStatus.Closed)
+        {
+            TempData["Warning"] = "Ticket is already open.";
+            return RedirectToAction(nameof(Details), new { id = ticket.Id });
+        }
+
+        var oldStatus = ticket.Status;
+        ticket.Status = TicketStatus.Open;
+        ticket.ClosedAtUtc = null;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        ticket.ReopenCount += 1;
+        ticket.ReopenedAtUtc = DateTime.UtcNow;
+        ticket.ReopenedByUserId = userId;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Ticket {TicketId} reopened by {UserId}", ticket.Id, userId);
+        await _emailSender.SendTicketStatusChangedAsync(ticket, oldStatus, ticket.Status);
+        TempData["Success"] = "Ticket reopened.";
+
+        return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadAttachment(int id, IFormFile attachment)
     {
         if (attachment == null)

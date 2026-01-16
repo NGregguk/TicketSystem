@@ -1,7 +1,13 @@
 @model TicketListViewModel
 
 <div class="card filter-card mb-4">
-    <div class="card-body">
+    <div class="card-header filter-card-header">
+        <button class="btn btn-link filter-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#ticket-filters" aria-expanded="true" aria-controls="ticket-filters">
+            Filters
+            <span class="filter-toggle-icon"></span>
+        </button>
+    </div>
+    <div class="card-body collapse show" id="ticket-filters">
         <form method="get" class="row g-3 align-items-end" data-disable-on-submit>
             <div class="col-lg-4">
                 <label class="form-label">Search</label>

@@ -44,6 +44,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(x => x.AssignedAdminUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.ReopenedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ReopenedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         builder.Entity<TicketComment>(entity =>

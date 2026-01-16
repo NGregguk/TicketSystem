@@ -1,6 +1,9 @@
 ﻿@model TicketDetailViewModel
 @{
     ViewData["Title"] = $"Ticket #{Model.Ticket.Id}";
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+    var isAdmin = User.IsInRole(RoleNames.Admin);
+    var isRequester = Model.Ticket.RequesterUserId == currentUserId;
     var header = new PageHeaderViewModel
     {
         Title = $"#{Model.Ticket.Id} {Model.Ticket.Title}",
@@ -16,10 +19,15 @@
                     <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." data-confirm="Close this ticket?">Close</button>
                 </form>
             }
+            else if (isAdmin || isRequester)
+            {
+                <form asp-action="Reopen" method="post" data-disable-on-submit>
+                    <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                    <button class="btn btn-outline-secondary" type="submit" data-loading-text="Reopening..." data-confirm="Reopen this ticket?">Reopen</button>
+                </form>
+            }
         </div>
     };
-    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-    var isAdmin = User.IsInRole(RoleNames.Admin);
 }
 
 @await Html.PartialAsync("_PageHeader", header)
@@ -236,6 +244,17 @@
                             <div class="info-label">Updated</div>
                             <div>@Model.Ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
                         </div>
+                        <div>
+                            <div class="info-label">Reopens</div>
+                            <div>@Model.Ticket.ReopenCount</div>
+                        </div>
+                        @if (Model.Ticket.ReopenedAtUtc.HasValue)
+                        {
+                            <div>
+                                <div class="info-label">Last Reopened</div>
+                                <div>@Model.Ticket.ReopenedAtUtc.Value.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                            </div>
+                        }
                     <div>
                         <div class="info-label">Status</div>
                         <div class="d-flex gap-2 flex-wrap">
@@ -336,6 +355,13 @@
                             <button class="btn btn-outline-danger" type="submit" data-loading-text="Closing..." data-confirm="Close this ticket?">Close Ticket</button>
                         </form>
                     }
+                    else if (isRequester)
+                    {
+                        <form asp-action="Reopen" method="post" data-disable-on-submit>
+                            <input type="hidden" name="id" value="@Model.Ticket.Id" />
+                            <button class="btn btn-outline-secondary" type="submit" data-loading-text="Reopening..." data-confirm="Reopen this ticket?">Reopen Ticket</button>
+                        </form>
+                    }
                 </div>
             </div>
             <div class="card mt-4">
@@ -362,6 +388,17 @@
                             <div class="info-label">Updated</div>
                             <div>@Model.Ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
                         </div>
+                        <div>
+                            <div class="info-label">Reopens</div>
+                            <div>@Model.Ticket.ReopenCount</div>
+                        </div>
+                        @if (Model.Ticket.ReopenedAtUtc.HasValue)
+                        {
+                            <div>
+                                <div class="info-label">Last Reopened</div>
+                                <div>@Model.Ticket.ReopenedAtUtc.Value.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</div>
+                            </div>
+                        }
                     <div>
                         <div class="info-label">Status</div>
                         <div class="d-flex gap-2 flex-wrap">

@@ -31,6 +31,10 @@ public class Ticket
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
+    public int ReopenCount { get; set; }
+    public DateTime? ReopenedAtUtc { get; set; }
+    public string? ReopenedByUserId { get; set; }
+    public ApplicationUser? ReopenedByUser { get; set; }
 
     [Timestamp]
     public byte[]? RowVersion { get; set; }
