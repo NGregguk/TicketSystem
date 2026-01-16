@@ -75,6 +75,7 @@ If SMTP is not configured, email is skipped with a warning log.
 
 ## Reports & exports
 - Admin-only Reports page includes ticket volume, SLA health, and workload by admin.
+- Charts support drill-down to the ticket list and a 14/30 day volume range toggle.
 - Export options:
   - CSV: raw ticket data with SLA state.
 
@@ -84,3 +85,4 @@ Migrations are included in `src/TicketingSystem/Migrations`.
 ## Notes
 - Logs are written to console and `logs/log-*.txt`.
 - Attachment uploads are stored on disk; metadata is stored in SQL Server.
+- Reopened tickets are tracked with a reopen count and last reopened timestamp.
