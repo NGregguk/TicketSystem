@@ -1,6 +1,6 @@
-﻿# Ticketing System (ASP.NET Core MVC)
+# IT Request System (ASP.NET Core MVC)
 
-Internal IT ticketing system designed for Windows Server + IIS.
+Internal IT request system designed for Windows Server + IIS.
 
 ## Prereqs
 - .NET 8 SDK
