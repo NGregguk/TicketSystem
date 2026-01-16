@@ -12,6 +12,7 @@
 @await Html.PartialAsync("_PageHeader", header)
 
 <form asp-action="Create" method="post" enctype="multipart/form-data" data-disable-on-submit>
+    <input type="hidden" asp-for="TempKey" />
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="card">
@@ -26,6 +27,8 @@
                         <label asp-for="Description" class="form-label"></label>
                         <textarea asp-for="Description" class="form-control" rows="7" placeholder="Describe the issue, impact, and any relevant context"></textarea>
                         <span asp-validation-for="Description" class="text-danger"></span>
+                        <div class="form-text">Tip: paste screenshots here (Ctrl+V).</div>
+                        <div class="paste-preview mt-2" id="description-paste-preview"></div>
                     </div>
                 </div>
             </div>
@@ -38,6 +41,12 @@
                         <label asp-for="CategoryId" class="form-label">Category</label>
                         <select asp-for="CategoryId" asp-items="Model.Categories" class="form-select"></select>
                         <span asp-validation-for="CategoryId" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="InternalSystemId" class="form-label">Internal System</label>
+                        <select asp-for="InternalSystemId" asp-items="Model.InternalSystems" class="form-select">
+                            <option value="">Select a system</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label asp-for="Priority" class="form-label">Priority</label>
@@ -61,4 +70,13 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/paste-attachments.js" asp-append-version="true"></script>
+    <script>
+        initPasteUpload({
+            textareaSelector: "#Description",
+            previewSelector: "#description-paste-preview",
+            uploadUrl: "@Url.Action("UploadTemp", "Attachments")",
+            tempKeySelector: "#TempKey"
+        });
+    </script>
 }

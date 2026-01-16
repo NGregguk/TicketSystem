@@ -6,8 +6,11 @@ public class TicketAttachment
 {
     public int Id { get; set; }
 
-    public int TicketId { get; set; }
+    public int? TicketId { get; set; }
     public Ticket? Ticket { get; set; }
+
+    [MaxLength(64)]
+    public string? TempKey { get; set; }
 
     [Required]
     [MaxLength(260)]

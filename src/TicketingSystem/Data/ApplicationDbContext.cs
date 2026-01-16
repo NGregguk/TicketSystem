@@ -13,6 +13,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<InternalSystem> InternalSystems => Set<InternalSystem>();
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketInternalNote> TicketInternalNotes => Set<TicketInternalNote>();
     public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
@@ -26,6 +27,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(x => x.Name).IsUnique();
         });
 
+        builder.Entity<InternalSystem>(entity =>
+        {
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+
         builder.Entity<Ticket>(entity =>
         {
             entity.Property(x => x.RowVersion).IsRowVersion();
@@ -33,6 +39,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(x => x.Category)
                 .WithMany(c => c.Tickets)
                 .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.InternalSystem)
+                .WithMany(s => s.Tickets)
+                .HasForeignKey(x => x.InternalSystemId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.RequesterUser)
@@ -79,6 +90,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<TicketAttachment>(entity =>
         {
+            entity.HasIndex(x => x.TempKey);
+
             entity.HasOne(x => x.Ticket)
                 .WithMany(t => t.Attachments)
                 .HasForeignKey(x => x.TicketId)

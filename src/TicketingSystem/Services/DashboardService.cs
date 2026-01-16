@@ -218,7 +218,7 @@ public class DashboardService
                 .Take(8)
                 .ToList(),
             NeedsAttentionTickets = needsAttentionTickets,
-            NeedsAttentionTitle = user.IsAdmin ? "Needs Attention" : "Your tickets needing action",
+            NeedsAttentionTitle = user.IsAdmin ? "Needs Attention" : "Tickets requiring your response",
             NeedsAttentionEmptyTitle = user.IsAdmin ? "No high priority items" : "You're all caught up",
             NeedsAttentionEmptyMessage = user.IsAdmin
                 ? "Waiting on user or high priority tickets will show up here."

@@ -43,21 +43,33 @@ public class FileSystemStorage : IFileStorage
         return true;
     }
 
-    public async Task<string> SaveAsync(IFormFile file, CancellationToken cancellationToken = default)
+    public Task<string> SaveAsync(IFormFile file, CancellationToken cancellationToken = default)
+    {
+        return SaveAsync(file, null, cancellationToken);
+    }
+
+    public async Task<string> SaveAsync(IFormFile file, string? subfolder, CancellationToken cancellationToken = default)
     {
         var root = Path.IsPathRooted(_options.RootPath)
             ? _options.RootPath
             : Path.Combine(_environment.ContentRootPath, _options.RootPath);
 
-        Directory.CreateDirectory(root);
+        var targetRoot = string.IsNullOrWhiteSpace(subfolder)
+            ? root
+            : Path.Combine(root, subfolder);
+
+        Directory.CreateDirectory(targetRoot);
 
         var storedFileName = $"{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
-        var fullPath = Path.Combine(root, storedFileName);
+        var relativePath = string.IsNullOrWhiteSpace(subfolder)
+            ? storedFileName
+            : Path.Combine(subfolder, storedFileName);
+        var fullPath = Path.Combine(targetRoot, storedFileName);
 
         await using var stream = new FileStream(fullPath, FileMode.CreateNew);
         await file.CopyToAsync(stream, cancellationToken);
 
-        _logger.LogInformation("Stored attachment {StoredFileName} ({SizeBytes} bytes)", storedFileName, file.Length);
-        return storedFileName;
+        _logger.LogInformation("Stored attachment {StoredFileName} ({SizeBytes} bytes)", relativePath, file.Length);
+        return relativePath;
     }
 }

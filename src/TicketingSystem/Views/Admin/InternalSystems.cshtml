@@ -1,12 +1,12 @@
-﻿@model IReadOnlyList<Category>
+@model IReadOnlyList<InternalSystem>
 @{
-    ViewData["Title"] = "Manage Categories";
+    ViewData["Title"] = "Manage Internal Systems";
     var header = new PageHeaderViewModel
     {
-        Title = "Categories",
-        Subtitle = "Manage the categories requesters can use.",
+        Title = "Internal Systems",
+        Subtitle = "Manage the systems requesters can select.",
         Actions = @<div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-primary" asp-action="InternalSystems">Internal Systems</a>
+            <a class="btn btn-outline-primary" asp-action="Categories">Categories</a>
             <a class="btn btn-outline-primary" asp-action="Users">Manage Users</a>
         </div>
     };
@@ -17,10 +17,10 @@
 <div class="card mb-4">
     <div class="card-header section-title">Quick Add</div>
     <div class="card-body">
-        <form asp-action="CreateCategory" method="post" class="row g-3 align-items-end" data-disable-on-submit>
+        <form asp-action="CreateInternalSystem" method="post" class="row g-3 align-items-end" data-disable-on-submit>
             <div class="col-md-6">
                 <label class="form-label">Name</label>
-                <input class="form-control" name="Name" placeholder="e.g., Hardware, Software" required />
+                <input class="form-control" name="Name" placeholder="e.g., Helix, Snapfulfil" minlength="2" maxlength="80" required />
             </div>
             <div class="col-md-3">
                 <label class="form-label">Active</label>
@@ -30,21 +30,21 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <button class="btn btn-primary" type="submit" data-loading-text="Adding...">Add Category</button>
+                <button class="btn btn-primary" type="submit" data-loading-text="Adding...">Add System</button>
             </div>
         </form>
     </div>
 </div>
 
 <div class="card">
-    <div class="card-header section-title">Category List</div>
+    <div class="card-header section-title">System List</div>
     <div class="card-body">
         @if (!Model.Any())
         {
             @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
             {
-                Title = "No categories yet",
-                Message = "Add categories to help users classify tickets."
+                Title = "No internal systems yet",
+                Message = "Add systems so requesters can tag their tickets."
             })
         }
         else
@@ -58,22 +58,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var category in Model)
+                    @foreach (var system in Model)
                     {
                         <tr>
-                            <td class="fw-semibold">@category.Name</td>
+                            <td class="fw-semibold">@system.Name</td>
                             <td>
-                                <span class="badge @(category.IsActive ? "badge-soft" : "badge-muted")">
-                                    @(category.IsActive ? "Active" : "Inactive")
+                                <span class="badge @(system.IsActive ? "badge-soft" : "badge-muted")">
+                                    @(system.IsActive ? "Active" : "Inactive")
                                 </span>
                             </td>
                             <td class="text-end">
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditCategory" asp-route-id="@category.Id">Edit</a>
-                                @if (category.IsActive)
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditInternalSystem" asp-route-id="@system.Id">Edit</a>
+                                @if (system.IsActive)
                                 {
-                                    <form asp-action="DeactivateCategory" method="post" class="d-inline" data-disable-on-submit>
-                                        <input type="hidden" name="id" value="@category.Id" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-loading-text="Deactivating..." onclick="return confirm('Deactivate this category?');">Deactivate</button>
+                                    <form asp-action="DeactivateInternalSystem" method="post" class="d-inline" data-disable-on-submit>
+                                        <input type="hidden" name="id" value="@system.Id" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" data-loading-text="Deactivating..." onclick="return confirm('Deactivate this internal system?');">Deactivate</button>
                                     </form>
                                 }
                             </td>

@@ -18,6 +18,7 @@ public static class DbInitializer
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var seedOptions = scope.ServiceProvider.GetRequiredService<IOptions<SeedUserOptions>>().Value;
+        var uploadOptions = scope.ServiceProvider.GetRequiredService<IOptions<UploadOptions>>().Value;
 
         if (!await roleManager.RoleExistsAsync(RoleNames.Admin))
         {
@@ -39,11 +40,25 @@ public static class DbInitializer
             await db.SaveChangesAsync();
         }
 
+        if (!await db.InternalSystems.AnyAsync())
+        {
+            db.InternalSystems.AddRange(
+                new InternalSystem { Name = "Helix" },
+                new InternalSystem { Name = "Snapfulfil" },
+                new InternalSystem { Name = "Aisle Print" },
+                new InternalSystem { Name = "Barcode Scanning System" },
+                new InternalSystem { Name = "Despatch Labels" }
+            );
+            await db.SaveChangesAsync();
+        }
+
         if (environment.IsDevelopment())
         {
             await EnsureUserAsync(userManager, seedOptions.AdminEmail, seedOptions.AdminPassword, RoleNames.Admin, "Admin User");
             await EnsureUserAsync(userManager, seedOptions.RequesterEmail, seedOptions.RequesterPassword, RoleNames.Requester, "Requester User");
         }
+
+        await CleanupTempAttachmentsAsync(db, environment, uploadOptions);
     }
 
     private static async Task EnsureUserAsync(UserManager<ApplicationUser> userManager, string email, string password, string role, string displayName)
@@ -71,5 +86,34 @@ public static class DbInitializer
         {
             await userManager.AddToRoleAsync(user, role);
         }
+    }
+
+    private static async Task CleanupTempAttachmentsAsync(ApplicationDbContext db, IWebHostEnvironment environment, UploadOptions uploadOptions)
+    {
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var tempAttachments = await db.TicketAttachments
+            .Where(a => a.TicketId == null && a.TempKey != null && a.UploadedAtUtc < cutoff)
+            .ToListAsync();
+
+        if (!tempAttachments.Any())
+        {
+            return;
+        }
+
+        var root = Path.IsPathRooted(uploadOptions.RootPath)
+            ? uploadOptions.RootPath
+            : Path.Combine(environment.ContentRootPath, uploadOptions.RootPath);
+
+        foreach (var attachment in tempAttachments)
+        {
+            var fullPath = Path.Combine(root, attachment.StoredFileName);
+            if (System.IO.File.Exists(fullPath))
+            {
+                System.IO.File.Delete(fullPath);
+            }
+        }
+
+        db.TicketAttachments.RemoveRange(tempAttachments);
+        await db.SaveChangesAsync();
     }
 }

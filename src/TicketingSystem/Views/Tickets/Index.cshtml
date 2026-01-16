@@ -36,6 +36,7 @@
                             <th>Status</th>
                             <th>Priority</th>
                             <th>Category</th>
+                            <th>System</th>
                             <th>Age</th>
                             <th>SLA</th>
                             <th>Updated</th>
@@ -58,6 +59,7 @@
                                 <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
                                 <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
                                 <td>@ticket.Category?.Name</td>
+                                <td>@ticket.InternalSystem?.Name</td>
                                 <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
                                 <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
                                 <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
@@ -87,6 +89,8 @@
                                    asp-route-status="@Model.Status"
                                    asp-route-priority="@Model.Priority"
                                    asp-route-categoryId="@Model.CategoryId"
+                                   asp-route-internalSystemId="@Model.InternalSystemId"
+                                   asp-route-pageSize="@Model.PageSize"
                                    asp-route-assignedAdminUserId="@Model.AssignedAdminUserId"
                                    asp-route-search="@Model.Search"
                                    asp-route-sla="@Model.Sla">@i</a>

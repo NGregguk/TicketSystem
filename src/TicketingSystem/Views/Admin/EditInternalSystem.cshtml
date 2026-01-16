@@ -1,0 +1,37 @@
+@model InternalSystemEditViewModel
+@{
+    ViewData["Title"] = "Edit Internal System";
+    var header = new PageHeaderViewModel
+    {
+        Title = "Edit Internal System",
+        Subtitle = "Update the system name or toggle its availability.",
+        Actions = @<a class="btn btn-outline-secondary" asp-action="InternalSystems">Back</a>
+    };
+}
+
+@await Html.PartialAsync("_PageHeader", header)
+
+<div class="card">
+    <div class="card-header section-title">System Details</div>
+    <div class="card-body">
+        <form asp-action="EditInternalSystem" method="post" data-disable-on-submit>
+            <input type="hidden" asp-for="Id" />
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="IsActive" class="form-label">Active</label>
+                <select asp-for="IsActive" class="form-select">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" data-loading-text="Saving...">Save</button>
+                <a class="btn btn-outline-secondary" asp-action="InternalSystems">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

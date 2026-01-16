@@ -16,7 +16,8 @@ namespace TicketingSystem.Controllers;
 [Authorize]
 public class TicketsController : Controller
 {
-    private const int PageSize = 10;
+    private const int DefaultPageSize = 50;
+    private static readonly HashSet<int> AllowedPageSizes = new() { 50, 100 };
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailSender _emailSender;
@@ -48,6 +49,7 @@ public class TicketsController : Controller
 
     public async Task<IActionResult> Index(
         int? categoryId,
+        int? internalSystemId,
         TicketStatus? status,
         TicketPriority? priority,
         string? assignedAdminUserId,
@@ -55,10 +57,16 @@ public class TicketsController : Controller
         string? sla,
         string? createdOn,
         string? closedOn,
-        int page = 1)
+        int page = 1,
+        int? pageSize = null)
     {
+        var effectivePageSize = pageSize.HasValue && AllowedPageSizes.Contains(pageSize.Value)
+            ? pageSize.Value
+            : DefaultPageSize;
+
         var query = _db.Tickets
             .Include(t => t.Category)
+            .Include(t => t.InternalSystem)
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
             .AsQueryable();
@@ -72,6 +80,11 @@ public class TicketsController : Controller
         if (categoryId.HasValue)
         {
             query = query.Where(t => t.CategoryId == categoryId);
+        }
+
+        if (internalSystemId.HasValue)
+        {
+            query = query.Where(t => t.InternalSystemId == internalSystemId);
         }
 
         if (status.HasValue)
@@ -151,19 +164,29 @@ public class TicketsController : Controller
         }
 
         var totalCount = await query.CountAsync();
-        var totalPages = (int)Math.Ceiling(totalCount / (double)PageSize);
+        var totalPages = (int)Math.Ceiling(totalCount / (double)effectivePageSize);
         if (page < 1) page = 1;
         if (page > totalPages && totalPages > 0) page = totalPages;
 
         var tickets = await query
             .OrderByDescending(t => t.CreatedAtUtc)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * effectivePageSize)
+            .Take(effectivePageSize)
             .ToListAsync();
 
         var categories = await _db.Categories
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        var internalSystemsQuery = _db.InternalSystems.AsQueryable();
+        if (!User.IsInRole(RoleNames.Admin))
+        {
+            internalSystemsQuery = internalSystemsQuery.Where(s => s.IsActive);
+        }
+
+        var internalSystems = await internalSystemsQuery
+            .OrderBy(s => s.Name)
             .ToListAsync();
 
         var adminUsers = await _userManager.GetUsersInRoleAsync(RoleNames.Admin);
@@ -172,17 +195,20 @@ public class TicketsController : Controller
         {
             Tickets = tickets,
             Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString())),
+            InternalSystems = internalSystems.Select(s => new SelectListItem(s.Name, s.Id.ToString())),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString())),
             Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString())),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id)),
             CategoryId = categoryId,
+            InternalSystemId = internalSystemId,
             Status = status,
             Priority = priority,
             AssignedAdminUserId = assignedAdminUserId,
             Search = search,
             Sla = sla,
             Page = page,
-            TotalPages = totalPages
+            TotalPages = totalPages,
+            PageSize = effectivePageSize
         };
 
         return View(viewModel);
@@ -213,10 +239,17 @@ public class TicketsController : Controller
             .OrderBy(c => c.Name)
             .ToListAsync();
 
+        var internalSystems = await _db.InternalSystems
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
         var viewModel = new TicketCreateViewModel
         {
             Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString())),
-            Priority = TicketPriority.Medium
+            InternalSystems = internalSystems.Select(s => new SelectListItem(s.Name, s.Id.ToString())),
+            Priority = TicketPriority.Medium,
+            TempKey = Guid.NewGuid().ToString("N")
         };
 
         return View(viewModel);
@@ -232,6 +265,16 @@ public class TicketsController : Controller
             .ToListAsync();
         model.Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString()));
 
+        var internalSystems = await _db.InternalSystems
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+        model.InternalSystems = internalSystems.Select(s => new SelectListItem(s.Name, s.Id.ToString()));
+        if (string.IsNullOrWhiteSpace(model.TempKey))
+        {
+            model.TempKey = Guid.NewGuid().ToString("N");
+        }
+
         if (!ModelState.IsValid)
         {
             return View(model);
@@ -245,6 +288,7 @@ public class TicketsController : Controller
             Title = model.Title.Trim(),
             Description = model.Description.Trim(),
             CategoryId = model.CategoryId!.Value,
+            InternalSystemId = model.InternalSystemId,
             Priority = model.Priority,
             Status = TicketStatus.Open,
             RequesterUserId = userId,
@@ -254,6 +298,8 @@ public class TicketsController : Controller
 
         _db.Tickets.Add(ticket);
         await _db.SaveChangesAsync();
+
+        await PromoteTempAttachmentsAsync(ticket.Id, userId, model.TempKey);
 
         if (model.Attachment != null)
         {
@@ -293,6 +339,7 @@ public class TicketsController : Controller
     {
         var ticket = await _db.Tickets
             .Include(t => t.Category)
+            .Include(t => t.InternalSystem)
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
             .Include(t => t.Comments)
@@ -323,16 +370,28 @@ public class TicketsController : Controller
             .OrderBy(c => c.Name)
             .ToListAsync();
 
+        var internalSystemsQuery = _db.InternalSystems.AsQueryable();
+        if (!User.IsInRole(RoleNames.Admin))
+        {
+            internalSystemsQuery = internalSystemsQuery.Where(s => s.IsActive);
+        }
+
+        var internalSystems = await internalSystemsQuery
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
         var viewModel = new TicketDetailViewModel
         {
             Ticket = ticket,
             Comments = ticket.Comments.OrderBy(c => c.CreatedAtUtc).ToList(),
             InternalNotes = ticket.InternalNotes.OrderByDescending(n => n.CreatedAtUtc).ToList(),
             Attachments = ticket.Attachments.OrderByDescending(a => a.UploadedAtUtc).ToList(),
+            AllowedAttachmentIds = ticket.Attachments.Select(a => a.Id).ToHashSet(),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status)),
             Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString(), p == ticket.Priority)),
-            Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString(), c.Id == ticket.CategoryId))
+            Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString(), c.Id == ticket.CategoryId)),
+            InternalSystems = internalSystems.Select(s => new SelectListItem(s.Name, s.Id.ToString(), s.Id == ticket.InternalSystemId))
         };
 
         return View(viewModel);
@@ -563,6 +622,27 @@ public class TicketsController : Controller
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }
 
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateInternalSystem(int id, TicketDetailViewModel model)
+    {
+        var ticket = await _db.Tickets.FindAsync(id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        ticket.InternalSystemId = model.NewInternalSystemId;
+        ticket.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Ticket {TicketId} internal system changed to {InternalSystemId}", ticket.Id, ticket.InternalSystemId);
+        TempData["Success"] = "Internal system updated.";
+
+        return RedirectToAction(nameof(Details), new { id = ticket.Id });
+    }
+
 
     [Authorize(Roles = RoleNames.Admin)]
     [HttpPost]
@@ -747,5 +827,51 @@ public class TicketsController : Controller
             : attachment.ContentType;
 
         return PhysicalFile(fullPath, contentType, attachment.OriginalFileName);
+    }
+
+    private async Task PromoteTempAttachmentsAsync(int ticketId, string userId, string tempKey)
+    {
+        if (string.IsNullOrWhiteSpace(tempKey))
+        {
+            return;
+        }
+
+        var attachments = await _db.TicketAttachments
+            .Where(a => a.TicketId == null && a.TempKey == tempKey && a.UploadedByUserId == userId)
+            .ToListAsync();
+
+        if (!attachments.Any())
+        {
+            return;
+        }
+
+        var root = Path.IsPathRooted(_uploadOptions.RootPath)
+            ? _uploadOptions.RootPath
+            : Path.Combine(_environment.ContentRootPath, _uploadOptions.RootPath);
+
+        var targetFolder = Path.Combine("tickets", ticketId.ToString());
+        var targetRoot = Path.Combine(root, targetFolder);
+        Directory.CreateDirectory(targetRoot);
+
+        foreach (var attachment in attachments)
+        {
+            var originalPath = Path.Combine(root, attachment.StoredFileName);
+            if (!System.IO.File.Exists(originalPath))
+            {
+                continue;
+            }
+
+            var fileName = Path.GetFileName(attachment.StoredFileName);
+            var newRelativePath = Path.Combine(targetFolder, fileName);
+            var newFullPath = Path.Combine(targetRoot, fileName);
+
+            System.IO.File.Move(originalPath, newFullPath, true);
+
+            attachment.TicketId = ticketId;
+            attachment.TempKey = null;
+            attachment.StoredFileName = newRelativePath;
+        }
+
+        await _db.SaveChangesAsync();
     }
 }

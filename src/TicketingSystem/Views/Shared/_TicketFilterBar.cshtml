@@ -44,12 +44,29 @@
                 </select>
             </div>
             <div class="col-lg-2 col-md-4">
+                <label class="form-label">Internal System</label>
+                <select class="form-select" name="internalSystemId">
+                    <option value="">All</option>
+                    @foreach (var system in Model.InternalSystems)
+                    {
+                        <option value="@system.Value" selected="@(system.Value == Model.InternalSystemId?.ToString())">@system.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
                 <label class="form-label">SLA</label>
                 <select class="form-select" name="sla">
                     <option value="">All</option>
                     <option value="ontrack" selected="@(Model.Sla == "ontrack")">On Track</option>
                     <option value="due" selected="@(Model.Sla == "due")">Due Soon</option>
                     <option value="overdue" selected="@(Model.Sla == "overdue")">Overdue</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <label class="form-label">Per Page</label>
+                <select class="form-select" name="pageSize">
+                    <option value="50" selected="@(Model.PageSize == 50)">50</option>
+                    <option value="100" selected="@(Model.PageSize == 100)">100</option>
                 </select>
             </div>
             @if (User.IsInRole(RoleNames.Admin))

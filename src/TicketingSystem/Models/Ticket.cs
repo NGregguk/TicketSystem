@@ -17,6 +17,9 @@ public class Ticket
     public int CategoryId { get; set; }
     public Category? Category { get; set; }
 
+    public int? InternalSystemId { get; set; }
+    public InternalSystem? InternalSystem { get; set; }
+
     public TicketPriority Priority { get; set; } = TicketPriority.None;
 
     public TicketStatus Status { get; set; } = TicketStatus.Open;

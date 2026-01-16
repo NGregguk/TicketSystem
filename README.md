@@ -85,5 +85,6 @@ Migrations are included in `src/TicketingSystem/Migrations`.
 ## Notes
 - Logs are written to console and `logs/log-*.txt`.
 - Attachment uploads are stored on disk; metadata is stored in SQL Server.
+- You can paste screenshots directly into ticket descriptions and replies (Ctrl+V). Images are uploaded as attachments and inserted inline using `[[image:ID]]` tokens.
 - Reopened tickets are tracked with a reopen count and last reopened timestamp.
 - SLA calculations use business hours (Mon–Fri 08:30–17:30, Europe/London).

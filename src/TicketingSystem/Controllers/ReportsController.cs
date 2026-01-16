@@ -35,13 +35,14 @@ public class ReportsController : Controller
         var tickets = await _db.Tickets
             .AsNoTracking()
             .Include(t => t.Category)
+            .Include(t => t.InternalSystem)
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
             .OrderByDescending(t => t.CreatedAtUtc)
             .ToListAsync();
 
         var builder = new StringBuilder();
-        builder.AppendLine("Id,Title,Status,Priority,Category,Requester,AssignedAdmin,CreatedAtUtc,UpdatedAtUtc,ClosedAtUtc,SlaState");
+        builder.AppendLine("Id,Title,Status,Priority,Category,InternalSystem,Requester,AssignedAdmin,CreatedAtUtc,UpdatedAtUtc,ClosedAtUtc,SlaState");
 
         foreach (var ticket in tickets)
         {
@@ -57,6 +58,7 @@ public class ReportsController : Controller
                 ticket.Status,
                 ticket.Priority,
                 EscapeCsv(ticket.Category?.Name),
+                EscapeCsv(ticket.InternalSystem?.Name),
                 EscapeCsv(requesterName),
                 EscapeCsv(assignedName),
                 ticket.CreatedAtUtc.ToString("O"),

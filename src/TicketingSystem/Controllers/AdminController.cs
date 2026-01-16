@@ -26,6 +26,12 @@ public class AdminController : Controller
         return View(categories);
     }
 
+    public async Task<IActionResult> InternalSystems()
+    {
+        var systems = await _db.InternalSystems.OrderBy(s => s.Name).ToListAsync();
+        return View(systems);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCategory(CategoryEditViewModel model)
@@ -87,6 +93,104 @@ public class AdminController : Controller
 
         TempData["Success"] = "Category updated.";
         return RedirectToAction(nameof(Categories));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateInternalSystem(InternalSystemEditViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            var systems = await _db.InternalSystems.OrderBy(s => s.Name).ToListAsync();
+            return View("InternalSystems", systems);
+        }
+
+        var name = model.Name.Trim();
+        var duplicate = await _db.InternalSystems
+            .AnyAsync(s => s.Name.ToLower() == name.ToLower());
+        if (duplicate)
+        {
+            TempData["Error"] = "An internal system with that name already exists.";
+            return RedirectToAction(nameof(InternalSystems));
+        }
+
+        var system = new InternalSystem
+        {
+            Name = name,
+            IsActive = model.IsActive
+        };
+
+        _db.InternalSystems.Add(system);
+        await _db.SaveChangesAsync();
+        TempData["Success"] = "Internal system added.";
+        return RedirectToAction(nameof(InternalSystems));
+    }
+
+    public async Task<IActionResult> EditInternalSystem(int id)
+    {
+        var system = await _db.InternalSystems.FindAsync(id);
+        if (system == null)
+        {
+            return NotFound();
+        }
+
+        var viewModel = new InternalSystemEditViewModel
+        {
+            Id = system.Id,
+            Name = system.Name,
+            IsActive = system.IsActive
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditInternalSystem(InternalSystemEditViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var system = await _db.InternalSystems.FindAsync(model.Id);
+        if (system == null)
+        {
+            return NotFound();
+        }
+
+        var name = model.Name.Trim();
+        var duplicate = await _db.InternalSystems
+            .AnyAsync(s => s.Id != model.Id && s.Name.ToLower() == name.ToLower());
+        if (duplicate)
+        {
+            ModelState.AddModelError(nameof(model.Name), "An internal system with that name already exists.");
+            return View(model);
+        }
+
+        system.Name = name;
+        system.IsActive = model.IsActive;
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Internal system updated.";
+        return RedirectToAction(nameof(InternalSystems));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeactivateInternalSystem(int id)
+    {
+        var system = await _db.InternalSystems.FindAsync(id);
+        if (system == null)
+        {
+            return NotFound();
+        }
+
+        system.IsActive = false;
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Internal system deactivated.";
+        return RedirectToAction(nameof(InternalSystems));
     }
 
     [HttpPost]
