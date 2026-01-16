@@ -7,6 +7,10 @@
         {
             <div class="page-subtitle">@Model.Subtitle</div>
         }
+        @if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+        {
+            <div class="page-subtitle">@Model.ScopeNote</div>
+        }
     </div>
     @if (Model.Actions != null)
     {

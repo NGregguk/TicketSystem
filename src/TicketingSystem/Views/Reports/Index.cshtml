@@ -18,7 +18,7 @@
 
 <div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
     <div class="col">
-        <div class="card report-kpi">
+        <div class="card report-kpi @(Model.TotalOpenCount == 0 ? "metric-card-zero" : "")">
             <div class="card-body">
                 <div class="report-kpi-label">Open Tickets</div>
                 <div class="report-kpi-value">@Model.TotalOpenCount</div>
@@ -26,7 +26,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card report-kpi">
+        <div class="card report-kpi @(Model.ClosedLast30DaysCount == 0 ? "metric-card-zero" : "")">
             <div class="card-body">
                 <div class="report-kpi-label">Closed (30d)</div>
                 <div class="report-kpi-value">@Model.ClosedLast30DaysCount</div>
@@ -34,7 +34,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card report-kpi">
+        <div class="card report-kpi @(Model.DueSoonCount == 0 ? "metric-card-zero" : "")">
             <div class="card-body">
                 <div class="report-kpi-label">Due Soon</div>
                 <div class="report-kpi-value">@Model.DueSoonCount</div>
@@ -42,7 +42,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card report-kpi">
+        <div class="card report-kpi @(Model.OverdueCount == 0 ? "metric-card-zero" : "")">
             <div class="card-body">
                 <div class="report-kpi-label">Overdue</div>
                 <div class="report-kpi-value">@Model.OverdueCount</div>

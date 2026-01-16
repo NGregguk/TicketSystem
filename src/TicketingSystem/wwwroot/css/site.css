@@ -12,6 +12,10 @@
   --danger: #dc2626;
   --info: #2563eb;
   --shadow-sm: 0 6px 14px rgba(15, 23, 42, 0.08);
+  --metric-zero-bg: #f8fafc;
+  --metric-zero-border: #e6ebf2;
+  --metric-zero-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  --metric-zero-label: #7c8796;
 }
 
 body {
@@ -154,6 +158,24 @@ body {
 
 .summary-card {
   min-height: 110px;
+}
+
+.metric-card-zero {
+  background: var(--metric-zero-bg);
+  border-color: var(--metric-zero-border);
+  box-shadow: var(--metric-zero-shadow);
+}
+
+.metric-card-zero .status-card-title,
+.metric-card-zero .sla-summary-label,
+.metric-card-zero .report-kpi-label {
+  color: var(--metric-zero-label);
+}
+
+.metric-card-zero .status-card-count,
+.metric-card-zero .sla-summary-count,
+.metric-card-zero .report-kpi-value {
+  color: var(--text);
 }
 
 .report-kpi {
@@ -558,6 +580,10 @@ body.dark-mode {
   --text: #e6e7e9;
   --muted: #a1a4aa;
   --shadow-sm: 0 10px 20px rgba(0, 0, 0, 0.35);
+  --metric-zero-bg: #17191c;
+  --metric-zero-border: #23262b;
+  --metric-zero-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  --metric-zero-label: #9aa0a8;
   background: radial-gradient(circle at top left, #17191c 0%, #111315 45%, #17191c 100%);
   color: var(--text);
 }
@@ -670,6 +696,12 @@ body.dark-mode .badge-sla {
 
 body.dark-mode .app-navbar {
   background: var(--brand);
+}
+
+body.dark-mode .metric-card-zero {
+  background: var(--metric-zero-bg);
+  border-color: var(--metric-zero-border);
+  box-shadow: var(--metric-zero-shadow);
 }
 
 @media (max-width: 992px) {

@@ -52,6 +52,7 @@ builder.Services.Configure<FormOptions>(options =>
 
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IFileStorage, FileSystemStorage>();
+builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 

@@ -1,11 +1,12 @@
 ﻿@model DashboardViewModel
 @using System.Text.Json
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = Model.Title;
     var header = new PageHeaderViewModel
     {
-        Title = "Dashboard",
-        Subtitle = "A quick view of ticket health and what needs attention.",
+        Title = Model.Title,
+        Subtitle = Model.Subtitle,
+        ScopeNote = Model.ScopeNote,
         Actions = @<a class="btn btn-primary" asp-controller="Tickets" asp-action="Create">Create Ticket</a>
     };
 }
@@ -15,14 +16,17 @@
 <div class="section-divider"><span>Status Summary</span></div>
 
 <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
-    @foreach (var status in Enum.GetValues<TicketStatus>().Where(s => s != TicketStatus.Resolved))
+    @foreach (var card in Model.StatusCards)
     {
+        var href = card.IsClickable && !string.IsNullOrWhiteSpace(card.FilterQueryString)
+            ? Url.Action("Index", "Tickets") + card.FilterQueryString
+            : string.Empty;
         <div class="col">
-            <a class="card status-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-status="@status">
+            <a class="card status-card summary-card @(card.Count == 0 ? "metric-card-zero" : "")" href="@href">
                 <div class="card-body">
-                    <div class="status-card-title">@status</div>
+                    <div class="status-card-title">@card.Label</div>
                     <div class="status-card-count">
-                        @(Model.StatusCounts.TryGetValue(status, out var count) ? count : 0)
+                        @card.Count
                     </div>
                 </div>
             </a>
@@ -33,45 +37,36 @@
 <div class="section-divider"><span>SLA Summary</span></div>
 
 <div class="row g-3 mb-4">
-    <div class="col-lg-4 col-md-6">
-        <a class="card sla-summary-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-sla="ontrack">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="sla-summary-label">On Track</div>
-                    <div class="sla-summary-count">@Model.OnTrackCount</div>
+    @foreach (var card in Model.SlaCards)
+    {
+        var href = card.IsClickable && !string.IsNullOrWhiteSpace(card.FilterQueryString)
+            ? Url.Action("Index", "Tickets") + card.FilterQueryString
+            : string.Empty;
+        var badgeClass = card.Key switch
+        {
+            "ontrack" => "sla-ontrack",
+            "due" => "sla-duesoon",
+            "overdue" => "sla-overdue",
+            _ => "sla-ontrack"
+        };
+        <div class="col-lg-4 col-md-6">
+            <a class="card sla-summary-card summary-card @(card.Count == 0 ? "metric-card-zero" : "")" href="@href">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="sla-summary-label">@card.Label</div>
+                        <div class="sla-summary-count">@card.Count</div>
+                    </div>
+                    <span class="badge badge-sla @badgeClass">@card.Label</span>
                 </div>
-                <span class="badge badge-sla sla-ontrack">On Track</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-lg-4 col-md-6">
-        <a class="card sla-summary-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-sla="due">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="sla-summary-label">Due Soon</div>
-                    <div class="sla-summary-count">@Model.DueSoonCount</div>
-                </div>
-                <span class="badge badge-sla sla-duesoon">Due Soon</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-lg-4 col-md-6">
-        <a class="card sla-summary-card summary-card" asp-controller="Tickets" asp-action="Index" asp-route-sla="overdue">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="sla-summary-label">Overdue</div>
-                    <div class="sla-summary-count">@Model.OverdueCount</div>
-                </div>
-                <span class="badge badge-sla sla-overdue">Overdue</span>
-            </div>
-        </a>
-    </div>
+            </a>
+        </div>
+    }
 </div>
 
 <div class="section-divider"><span>Workload</span></div>
 
-<div class="row g-4 @(User.IsInRole(RoleNames.Admin) ? "" : "justify-content-center")">
-    <div class="col-lg-6 @(User.IsInRole(RoleNames.Admin) ? "" : "col-md-8")">
+<div class="row g-4 @(Model.IsAdmin ? "" : "justify-content-center")">
+    <div class="col-lg-6 @(Model.IsAdmin ? "" : "col-md-8")">
         <div class="card h-100">
             <div class="card-header section-title">My Open Tickets</div>
             <div class="card-body">
@@ -104,7 +99,7 @@
         </div>
     </div>
 
-    @if (User.IsInRole(RoleNames.Admin))
+    @if (Model.IsAdmin)
     {
         <div class="col-lg-6">
             <div class="card mb-4 h-100">
@@ -136,57 +131,57 @@
                 </div>
             </div>
         </div>
+    }
 
-        <div class="col-lg-12">
-            <div class="card">
-                <div class="card-header section-title">Needs Attention</div>
-                <div class="card-body">
-                    @if (!Model.NeedsAttentionTickets.Any())
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header section-title">@Model.NeedsAttentionTitle</div>
+            <div class="card-body">
+                @if (!Model.NeedsAttentionTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
                     {
-                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
-                        {
-                            Title = "No high priority items",
-                            Message = "Waiting on user or high priority tickets will show up here."
-                        })
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Title</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Category</th>
-                                        <th>Age</th>
-                                        <th>SLA</th>
-                                        <th>Updated</th>
+                        Title = Model.NeedsAttentionEmptyTitle,
+                        Message = Model.NeedsAttentionEmptyMessage
+                    })
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Category</th>
+                                    <th>Age</th>
+                                    <th>SLA</th>
+                                    <th>Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.NeedsAttentionTickets)
+                                {
+                                    <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                        <td class="fw-semibold">#@ticket.Id</td>
+                                        <td>@ticket.Title</td>
+                                        <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
+                                        <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
+                                        <td>@ticket.Category?.Name</td>
+                                        <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
+                                        <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
+                                        <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var ticket in Model.NeedsAttentionTickets)
-                                    {
-                                        <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
-                                            <td class="fw-semibold">#@ticket.Id</td>
-                                            <td>@ticket.Title</td>
-                                            <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
-                                            <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
-                                            <td>@ticket.Category?.Name</td>
-                                            <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
-                                            <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
-                                            <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                </div>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
         </div>
-    }
+    </div>
 </div>
 
 <div class="section-divider"><span>Reporting</span></div>
@@ -271,6 +266,8 @@
         const volumeLabels30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeLabels30));
         const volumeCreated30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeCreatedCounts30));
         const volumeClosed30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts30));
+        const volumeDateKeys14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys14));
+        const volumeDateKeys30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys30));
 
         const ctx = document.getElementById("ticket-volume-chart");
         if (ctx) {
@@ -350,6 +347,25 @@
                     updateRange(button.getAttribute("data-volume-range"));
                 });
             });
+
+            ctx.onclick = (event) => {
+                const points = chartInstance.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const point = points[0];
+                const index = point.index;
+                const datasetIndex = point.datasetIndex;
+                const isCreated = datasetIndex === 0;
+                const dateKey = currentRange === "30" ? volumeDateKeys30[index] : volumeDateKeys14[index];
+                if (!dateKey) {
+                    return;
+                }
+                const baseUrl = "@Url.Action("Index", "Tickets")";
+                const paramName = isCreated ? "createdOn" : "closedOn";
+                const target = `${baseUrl}?${paramName}=${encodeURIComponent(dateKey)}`;
+                window.location.href = target;
+            };
         }
 
         const slaCard = document.getElementById("sla-chart-card");
@@ -375,7 +391,7 @@
             const isDark = document.body.classList.contains("dark-mode");
             const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
             const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
-            new Chart(slaCtx, {
+            const slaChart = new Chart(slaCtx, {
                 type: "doughnut",
                 data: {
                     labels: ["On Track", "Due Soon", "Overdue"],
@@ -396,6 +412,21 @@
                     }
                 }
             });
+
+            slaCtx.onclick = (event) => {
+                const points = slaChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const index = points[0].index;
+                const slaMap = ["ontrack", "due", "overdue"];
+                const slaValue = slaMap[index];
+                if (!slaValue) {
+                    return;
+                }
+                const target = "@Url.Action("Index", "Tickets")" + `?sla=${encodeURIComponent(slaValue)}`;
+                window.location.href = target;
+            };
         }
 
         const categoryCard = document.getElementById("category-chart-card");
@@ -417,6 +448,7 @@
 
         const categoryLabels = @Html.Raw(JsonSerializer.Serialize(Model.CategoryLabels));
         const categoryCounts = @Html.Raw(JsonSerializer.Serialize(Model.CategoryCounts));
+        const categoryIds = @Html.Raw(JsonSerializer.Serialize(Model.CategoryIds));
 
         const categoryCtx = document.getElementById("category-mix-chart");
         if (categoryCtx) {
@@ -424,7 +456,7 @@
             const isDark = document.body.classList.contains("dark-mode");
             const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
             const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
-            new Chart(categoryCtx, {
+            const categoryChart = new Chart(categoryCtx, {
                 type: "bar",
                 data: {
                     labels: categoryLabels,
@@ -455,6 +487,20 @@
                     }
                 }
             });
+
+            categoryCtx.onclick = (event) => {
+                const points = categoryChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
+                if (!points.length) {
+                    return;
+                }
+                const index = points[0].index;
+                const categoryId = categoryIds[index];
+                if (!categoryId) {
+                    return;
+                }
+                const target = "@Url.Action("Index", "Tickets")" + `?categoryId=${encodeURIComponent(categoryId)}`;
+                window.location.href = target;
+            };
         }
     </script>
 }
