@@ -10,8 +10,8 @@ public class DashboardViewModel
     public string? ScopeNote { get; set; }
     public IReadOnlyList<DashboardMetricCard> StatusCards { get; set; } = Array.Empty<DashboardMetricCard>();
     public IReadOnlyList<DashboardMetricCard> SlaCards { get; set; } = Array.Empty<DashboardMetricCard>();
+    public string MyOpenTicketsTitle { get; set; } = "My Open Tickets";
     public IReadOnlyList<Ticket> MyOpenTickets { get; set; } = Array.Empty<Ticket>();
-    public IReadOnlyList<Ticket> UnassignedTickets { get; set; } = Array.Empty<Ticket>();
     public IReadOnlyList<Ticket> NeedsAttentionTickets { get; set; } = Array.Empty<Ticket>();
     public string NeedsAttentionTitle { get; set; } = "Needs Attention";
     public string NeedsAttentionEmptyTitle { get; set; } = "No items to review";

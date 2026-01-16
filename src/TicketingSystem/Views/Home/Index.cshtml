@@ -15,7 +15,7 @@
 
 <div class="section-divider"><span>Status Summary</span></div>
 
-<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4 summary-row">
     @foreach (var card in Model.StatusCards)
     {
         var href = card.IsClickable && !string.IsNullOrWhiteSpace(card.FilterQueryString)
@@ -36,7 +36,7 @@
 
 <div class="section-divider"><span>SLA Summary</span></div>
 
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 summary-row">
     @foreach (var card in Model.SlaCards)
     {
         var href = card.IsClickable && !string.IsNullOrWhiteSpace(card.FilterQueryString)
@@ -63,77 +63,10 @@
     }
 </div>
 
-<div class="section-divider"><span>Workload</span></div>
+<div class="section-divider"><span>Needs Attention</span></div>
 
-<div class="row g-4 @(Model.IsAdmin ? "" : "justify-content-center")">
-    <div class="col-lg-6 @(Model.IsAdmin ? "" : "col-md-8")">
-        <div class="card h-100">
-            <div class="card-header section-title">My Open Tickets</div>
-            <div class="card-body">
-                @if (!Model.MyOpenTickets.Any())
-                {
-                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
-                    {
-                        Title = "No open tickets yet",
-                        Message = "Create your first ticket to get support.",
-                        ActionText = "Create Ticket",
-                        ActionUrl = Url.Action("Create", "Tickets")
-                    })
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var ticket in Model.MyOpenTickets)
-                        {
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                    <div class="ticket-meta">@ticket.Category?.Name | Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
-                                </div>
-                                @await Html.PartialAsync("_BadgeStatus", ticket.Status)
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
-    </div>
-
-    @if (Model.IsAdmin)
-    {
-        <div class="col-lg-6">
-            <div class="card mb-4 h-100">
-                <div class="card-header section-title">Unassigned Tickets</div>
-                <div class="card-body">
-                    @if (!Model.UnassignedTickets.Any())
-                    {
-                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
-                        {
-                            Title = "All tickets are assigned",
-                            Message = "No unassigned tickets at the moment."
-                        })
-                    }
-                    else
-                    {
-                        <ul class="list-group list-group-flush">
-                            @foreach (var ticket in Model.UnassignedTickets)
-                            {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <a class="fw-semibold" asp-controller="Tickets" asp-action="Details" asp-route-id="@ticket.Id">#@ticket.Id - @ticket.Title</a>
-                                        <div class="ticket-meta">@ticket.Category?.Name | Open @SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</div>
-                                    </div>
-                                    @await Html.PartialAsync("_BadgeStatus", ticket.Status)
-                                </li>
-                            }
-                        </ul>
-                    }
-                </div>
-            </div>
-        </div>
-    }
-
-    <div class="col-lg-12">
+<div class="row g-4">
+    <div class="col-12">
         <div class="card">
             <div class="card-header section-title d-flex align-items-center justify-content-between">
                 <span>@Model.NeedsAttentionTitle</span>
@@ -187,6 +120,63 @@
                                         <td>@ticket.Category?.Name</td>
                                         <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
                                         <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
+                                        <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-divider"><span>Your Work</span></div>
+
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header section-title">@Model.MyOpenTicketsTitle</div>
+            <div class="card-body">
+                @if (!Model.MyOpenTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = "No open tickets yet",
+                        Message = "Create your first ticket to get support.",
+                        ActionText = "Create Ticket",
+                        ActionUrl = Url.Action("Create", "Tickets")
+                    })
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>SLA</th>
+                                    <th>Age</th>
+                                    <th>Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.MyOpenTickets)
+                                {
+                                    <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                        <td class="fw-semibold">#@ticket.Id</td>
+                                        <td>
+                                            <div class="fw-semibold">@ticket.Title</div>
+                                            <div class="ticket-meta">@ticket.Category?.Name</div>
+                                        </td>
+                                        <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
+                                        <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
+                                        <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
+                                        <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
                                         <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
                                     </tr>
                                 }

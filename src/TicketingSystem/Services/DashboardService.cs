@@ -31,13 +31,27 @@ public class DashboardService
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
-        var statusCards = new List<DashboardMetricCard>
+        var unassignedCount = 0;
+        if (user.IsAdmin)
+        {
+            unassignedCount = await scopedTickets
+                .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
+                .CountAsync();
+        }
+
+        var statusCards = new List<DashboardMetricCard>();
+        if (user.IsAdmin)
+        {
+            statusCards.Add(BuildCard("unassigned", "Unassigned", unassignedCount, "?assignedAdminUserId=unassigned"));
+        }
+
+        statusCards.AddRange(new[]
         {
             BuildCard("open", "Open", statusCounts.GetValueOrDefault(TicketStatus.Open), "?status=Open"),
             BuildCard("inprogress", "In Progress", statusCounts.GetValueOrDefault(TicketStatus.InProgress), "?status=InProgress"),
             BuildCard("waiting", "Waiting on User", statusCounts.GetValueOrDefault(TicketStatus.WaitingOnUser), "?status=WaitingOnUser"),
             BuildCard("closed", "Closed", statusCounts.GetValueOrDefault(TicketStatus.Closed), "?status=Closed")
-        };
+        });
 
         var slaCandidates = await scopedTickets
             .Where(t => t.Status != TicketStatus.Closed)
@@ -112,26 +126,30 @@ public class DashboardService
         var categoryIds = categoryCounts.Select(x => x.CategoryId).ToList();
         var categoryData = categoryCounts.Select(x => x.Count).ToList();
 
-        var myOpenTickets = await _db.Tickets
+        var myOpenTicketsQuery = _db.Tickets
             .AsNoTracking()
             .Include(t => t.Category)
-            .Where(t => t.RequesterUserId == user.UserId && t.Status != TicketStatus.Closed)
-            .OrderByDescending(t => t.CreatedAtUtc)
-            .Take(5)
+            .Include(t => t.RequesterUser)
+            .Where(t => t.Status != TicketStatus.Closed);
+
+        if (user.IsAdmin)
+        {
+            myOpenTicketsQuery = myOpenTicketsQuery.Where(t => t.AssignedAdminUserId == user.UserId);
+        }
+        else
+        {
+            myOpenTicketsQuery = myOpenTicketsQuery.Where(t => t.RequesterUserId == user.UserId);
+        }
+
+        var myOpenTickets = await myOpenTicketsQuery
+            .OrderByDescending(t => t.UpdatedAtUtc)
+            .Take(20)
             .ToListAsync();
 
-        var unassignedTickets = new List<Ticket>();
         var needsAttentionTickets = new List<Ticket>();
 
         if (user.IsAdmin)
         {
-            unassignedTickets = await scopedTickets
-                .Include(t => t.Category)
-                .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
-                .OrderByDescending(t => t.CreatedAtUtc)
-                .Take(5)
-                .ToListAsync();
-
             needsAttentionTickets = await scopedTickets
                 .Include(t => t.Category)
                 .Where(t => t.Status == TicketStatus.WaitingOnUser
@@ -176,8 +194,29 @@ public class DashboardService
             ScopeNote = user.IsAdmin ? null : "Showing your tickets only.",
             StatusCards = statusCards,
             SlaCards = slaCards,
-            MyOpenTickets = myOpenTickets,
-            UnassignedTickets = unassignedTickets,
+            MyOpenTicketsTitle = user.IsAdmin ? "My Open Tickets" : "Your Open Tickets",
+            MyOpenTickets = myOpenTickets
+                .OrderBy(t =>
+                {
+                    var slaState = SlaHelper.GetSlaState(t.CreatedAtUtc, t.Priority, _slaOptions);
+                    return slaState switch
+                    {
+                        SlaState.Overdue => 0,
+                        SlaState.DueSoon => 1,
+                        _ => 2
+                    };
+                })
+                .ThenBy(t => t.Priority switch
+                {
+                    TicketPriority.Critical => 0,
+                    TicketPriority.High => 1,
+                    TicketPriority.Medium => 2,
+                    TicketPriority.Low => 3,
+                    _ => 4
+                })
+                .ThenBy(t => t.CreatedAtUtc)
+                .Take(8)
+                .ToList(),
             NeedsAttentionTickets = needsAttentionTickets,
             NeedsAttentionTitle = user.IsAdmin ? "Needs Attention" : "Your tickets needing action",
             NeedsAttentionEmptyTitle = user.IsAdmin ? "No high priority items" : "You're all caught up",
