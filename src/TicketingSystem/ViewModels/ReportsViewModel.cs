@@ -10,6 +10,8 @@ public class ReportsViewModel
     public int OnTrackCount { get; set; }
     public int DueSoonCount { get; set; }
     public int OverdueCount { get; set; }
+    public int TimeLoggedMinutes30 { get; set; }
+    public List<ReportsTimeTicketItem> TopTimeTickets { get; set; } = new();
     public List<string> VolumeLabels { get; set; } = new();
     public List<int> VolumeCreatedCounts { get; set; } = new();
     public List<int> VolumeClosedCounts { get; set; } = new();
@@ -35,4 +37,11 @@ public class ReportsTicketItem
     public string Title { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; }
     public string? Category { get; set; }
+}
+
+public class ReportsTimeTicketItem
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int Minutes { get; set; }
 }

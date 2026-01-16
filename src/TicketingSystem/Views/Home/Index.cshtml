@@ -2,6 +2,7 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = Model.Title;
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
     var header = new PageHeaderViewModel
     {
         Title = Model.Title,
@@ -13,7 +14,13 @@
 
 @await Html.PartialAsync("_PageHeader", header)
 
-<div class="section-divider"><span>Status Summary</span></div>
+@{
+    var globalScopeLabel = "All Tickets";
+    var needsAttentionScopeLabel = Model.IsAdmin ? "All Tickets" : "Your Tickets";
+    var workScopeLabel = Model.IsAdmin ? "Assigned to you" : string.Empty;
+}
+
+<div class="section-divider"><span>Status Summary - @globalScopeLabel</span></div>
 
 <div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4 summary-row">
     @foreach (var card in Model.StatusCards)
@@ -34,7 +41,7 @@
     }
 </div>
 
-<div class="section-divider"><span>SLA Summary</span></div>
+<div class="section-divider"><span>SLA Summary - @globalScopeLabel</span></div>
 
 <div class="row g-3 mb-4 summary-row">
     @foreach (var card in Model.SlaCards)
@@ -63,7 +70,7 @@
     }
 </div>
 
-<div class="section-divider"><span>Needs Attention</span></div>
+<div class="section-divider"><span>Needs Attention - @needsAttentionScopeLabel</span></div>
 
 <div class="row g-4">
     <div class="col-12">
@@ -132,7 +139,11 @@
     </div>
 </div>
 
-<div class="section-divider"><span>Your Work</span></div>
+<div class="section-divider">
+    <span>
+        @(string.IsNullOrWhiteSpace(workScopeLabel) ? "Your Work" : $"Your Work - {workScopeLabel}")
+    </span>
+</div>
 
 <div class="row g-4">
     <div class="col-12">
@@ -189,11 +200,71 @@
     </div>
 </div>
 
+<div class="section-divider"><span>Subscribed Tickets - Other Requesters</span></div>
+
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header section-title">@Model.SubscribedTicketsTitle</div>
+            <div class="card-body">
+                @if (!Model.SubscribedTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = Model.SubscribedTicketsEmptyTitle,
+                        Message = Model.SubscribedTicketsEmptyMessage
+                    })
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Requester</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.SubscribedTickets)
+                                {
+                                    <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                        <td class="fw-semibold">#@ticket.Id</td>
+                                        <td>
+                                            <div class="fw-semibold">@ticket.Title</div>
+                                            <div class="ticket-meta">@ticket.Category?.Name</div>
+                                        </td>
+                                        <td>@(string.IsNullOrWhiteSpace(ticket.RequesterUser?.DisplayName) ? ticket.RequesterUser?.Email : ticket.RequesterUser?.DisplayName)</td>
+                                        <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
+                                        <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
+                                        <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="section-divider"><span>Reporting</span></div>
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 mt-4">
     <div class="section-title">Ticket Volume</div>
     <div class="d-flex flex-wrap gap-2">
+        @if (!Model.IsAdmin)
+        {
+            <div class="btn-group btn-group-sm" role="group" aria-label="Reporting scope">
+                <button class="btn btn-outline-secondary" type="button" data-report-scope="all">All Tickets</button>
+                <button class="btn btn-outline-secondary" type="button" data-report-scope="mine">My Tickets</button>
+            </div>
+        }
         <div class="btn-group btn-group-sm" role="group" aria-label="Ticket volume range">
             <button class="btn btn-outline-secondary" type="button" data-volume-range="14">14 Days</button>
             <button class="btn btn-outline-secondary" type="button" data-volume-range="30">30 Days</button>
@@ -273,6 +344,41 @@
         const volumeClosed30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeClosedCounts30));
         const volumeDateKeys14 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys14));
         const volumeDateKeys30 = @Html.Raw(JsonSerializer.Serialize(Model.VolumeDateKeys30));
+        const myVolumeCreated14 = @Html.Raw(JsonSerializer.Serialize(Model.MyVolumeCreatedCounts14));
+        const myVolumeClosed14 = @Html.Raw(JsonSerializer.Serialize(Model.MyVolumeClosedCounts14));
+        const myVolumeCreated30 = @Html.Raw(JsonSerializer.Serialize(Model.MyVolumeCreatedCounts30));
+        const myVolumeClosed30 = @Html.Raw(JsonSerializer.Serialize(Model.MyVolumeClosedCounts30));
+        const mySlaCounts = [@Model.MyOnTrackCount, @Model.MyDueSoonCount, @Model.MyOverdueCount];
+        const myCategoryLabels = @Html.Raw(JsonSerializer.Serialize(Model.MyCategoryLabels));
+        const myCategoryCounts = @Html.Raw(JsonSerializer.Serialize(Model.MyCategoryCounts));
+        const myCategoryIds = @Html.Raw(JsonSerializer.Serialize(Model.MyCategoryIds));
+        const requesterUserId = "@currentUserId";
+        const scopeButtons = document.querySelectorAll("[data-report-scope]");
+        let currentScope = localStorage.getItem("dashboardReportScope") || "all";
+        if (@Model.IsAdmin.ToString().ToLowerInvariant()) {
+            currentScope = "all";
+        }
+
+        let updateVolumeScope = () => {};
+        let updateSlaScope = () => {};
+        let updateCategoryScope = () => {};
+
+        const updateScopeButtons = () => {
+            scopeButtons.forEach((button) => {
+                const isActive = button.getAttribute("data-report-scope") === currentScope;
+                button.classList.toggle("btn-primary", isActive);
+                button.classList.toggle("btn-outline-secondary", !isActive);
+            });
+        };
+
+        const updateScope = (scope) => {
+            currentScope = scope;
+            localStorage.setItem("dashboardReportScope", scope);
+            updateScopeButtons();
+            updateVolumeScope();
+            updateSlaScope();
+            updateCategoryScope();
+        };
 
         const ctx = document.getElementById("ticket-volume-chart");
         if (ctx) {
@@ -283,6 +389,20 @@
             const isDark = document.body.classList.contains("dark-mode");
             const textColor = styles.getPropertyValue("--text").trim() || (isDark ? "#e6e7e9" : "#0f172a");
             const gridColor = styles.getPropertyValue("--border").trim() || (isDark ? "#2a2d31" : "#d9dee6");
+
+            const getVolumeCreated = (range) => {
+                if (currentScope === "mine") {
+                    return range === "30" ? myVolumeCreated30 : myVolumeCreated14;
+                }
+                return range === "30" ? volumeCreated30 : volumeCreated14;
+            };
+
+            const getVolumeClosed = (range) => {
+                if (currentScope === "mine") {
+                    return range === "30" ? myVolumeClosed30 : myVolumeClosed14;
+                }
+                return range === "30" ? volumeClosed30 : volumeClosed14;
+            };
             const chartInstance = new Chart(ctx, {
                 type: "line",
                 data: {
@@ -290,7 +410,7 @@
                     datasets: [
                         {
                             label: "Created",
-                            data: currentRange === "30" ? volumeCreated30 : volumeCreated14,
+                            data: getVolumeCreated(currentRange),
                             borderColor: isDark ? "#6ea8c7" : "#0f4c6b",
                             backgroundColor: isDark ? "rgba(110, 168, 199, 0.2)" : "rgba(15, 76, 107, 0.15)",
                             tension: 0.3,
@@ -298,7 +418,7 @@
                         },
                         {
                             label: "Closed",
-                            data: currentRange === "30" ? volumeClosed30 : volumeClosed14,
+                            data: getVolumeClosed(currentRange),
                             borderColor: isDark ? "#86efac" : "#16a34a",
                             backgroundColor: isDark ? "rgba(134, 239, 172, 0.18)" : "rgba(22, 163, 74, 0.12)",
                             tension: 0.3,
@@ -332,8 +452,8 @@
                 currentRange = range;
                 localStorage.setItem("dashboardVolumeRange", range);
                 chartInstance.data.labels = range === "30" ? volumeLabels30 : volumeLabels14;
-                chartInstance.data.datasets[0].data = range === "30" ? volumeCreated30 : volumeCreated14;
-                chartInstance.data.datasets[1].data = range === "30" ? volumeClosed30 : volumeClosed14;
+                chartInstance.data.datasets[0].data = getVolumeCreated(range);
+                chartInstance.data.datasets[1].data = getVolumeClosed(range);
                 chartInstance.update();
                 if (chartTitle) {
                     chartTitle.textContent = `Ticket Volume (Last ${range} Days)`;
@@ -345,11 +465,22 @@
                 });
             };
 
+            updateVolumeScope = () => {
+                updateRange(currentRange);
+            };
+
             updateRange(currentRange);
+            updateScopeButtons();
 
             rangeButtons.forEach((button) => {
                 button.addEventListener("click", () => {
                     updateRange(button.getAttribute("data-volume-range"));
+                });
+            });
+
+            scopeButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    updateScope(button.getAttribute("data-report-scope"));
                 });
             });
 
@@ -368,7 +499,8 @@
                 }
                 const baseUrl = "@Url.Action("Index", "Tickets")";
                 const paramName = isCreated ? "createdOn" : "closedOn";
-                const target = `${baseUrl}?${paramName}=${encodeURIComponent(dateKey)}`;
+                const scopeParam = currentScope === "mine" && requesterUserId ? `&requesterUserId=${encodeURIComponent(requesterUserId)}` : "";
+                const target = `${baseUrl}?${paramName}=${encodeURIComponent(dateKey)}${scopeParam}`;
                 window.location.href = target;
             };
         }
@@ -418,6 +550,15 @@
                 }
             });
 
+            updateSlaScope = () => {
+                if (!slaChart) {
+                    return;
+                }
+                const data = currentScope === "mine" ? mySlaCounts : [@Model.OnTrackCount, @Model.DueSoonCount, @Model.OverdueCount];
+                slaChart.data.datasets[0].data = data;
+                slaChart.update();
+            };
+
             slaCtx.onclick = (event) => {
                 const points = slaChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
                 if (!points.length) {
@@ -429,7 +570,8 @@
                 if (!slaValue) {
                     return;
                 }
-                const target = "@Url.Action("Index", "Tickets")" + `?sla=${encodeURIComponent(slaValue)}`;
+                const scopeParam = currentScope === "mine" && requesterUserId ? `&requesterUserId=${encodeURIComponent(requesterUserId)}` : "";
+                const target = "@Url.Action("Index", "Tickets")" + `?sla=${encodeURIComponent(slaValue)}${scopeParam}`;
                 window.location.href = target;
             };
         }
@@ -493,19 +635,35 @@
                 }
             });
 
+            updateCategoryScope = () => {
+                if (!categoryChart) {
+                    return;
+                }
+                const labels = currentScope === "mine" ? myCategoryLabels : categoryLabels;
+                const counts = currentScope === "mine" ? myCategoryCounts : categoryCounts;
+                categoryChart.data.labels = labels;
+                categoryChart.data.datasets[0].data = counts;
+                categoryChart.update();
+            };
+
             categoryCtx.onclick = (event) => {
                 const points = categoryChart.getElementsAtEventForMode(event, "nearest", { intersect: true }, true);
                 if (!points.length) {
                     return;
                 }
                 const index = points[0].index;
-                const categoryId = categoryIds[index];
+                const categoryId = currentScope === "mine" ? myCategoryIds[index] : categoryIds[index];
                 if (!categoryId) {
                     return;
                 }
-                const target = "@Url.Action("Index", "Tickets")" + `?categoryId=${encodeURIComponent(categoryId)}`;
+                const scopeParam = currentScope === "mine" && requesterUserId ? `&requesterUserId=${encodeURIComponent(requesterUserId)}` : "";
+                const target = "@Url.Action("Index", "Tickets")" + `?categoryId=${encodeURIComponent(categoryId)}${scopeParam}`;
                 window.location.href = target;
             };
+        }
+
+        if (scopeButtons.length) {
+            updateScope(currentScope);
         }
     </script>
 }

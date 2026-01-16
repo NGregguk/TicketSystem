@@ -12,11 +12,13 @@ public class DashboardService
 {
     private readonly ApplicationDbContext _db;
     private readonly SlaOptions _slaOptions;
+    private readonly TicketAccessService _ticketAccess;
 
-    public DashboardService(ApplicationDbContext db, IOptions<SlaOptions> slaOptions)
+    public DashboardService(ApplicationDbContext db, IOptions<SlaOptions> slaOptions, TicketAccessService ticketAccess)
     {
         _db = db;
         _slaOptions = slaOptions.Value;
+        _ticketAccess = ticketAccess;
     }
 
     public async Task<DashboardViewModel> GetDashboardAsync(DashboardUserContext user)
@@ -24,27 +26,20 @@ public class DashboardService
         var nowUtc = DateTime.UtcNow;
         var startDate = nowUtc.Date.AddDays(-29);
 
-        var scopedTickets = ApplyScope(_db.Tickets.AsNoTracking(), user);
-        var showGlobal = user.CanViewAll;
+        var scopedTickets = _ticketAccess.ApplyViewScope(_db.Tickets.AsNoTracking(), user.UserId, user.IsAdmin);
+        var showGlobal = user.IsAdmin;
 
         var statusCounts = await scopedTickets
             .GroupBy(t => t.Status)
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
-        var unassignedCount = 0;
-        if (showGlobal)
-        {
-            unassignedCount = await scopedTickets
-                .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
-                .CountAsync();
-        }
+        var unassignedCount = await scopedTickets
+            .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
+            .CountAsync();
 
         var statusCards = new List<DashboardMetricCard>();
-        if (showGlobal)
-        {
-            statusCards.Add(BuildCard("unassigned", "Unassigned", unassignedCount, "?assignedAdminUserId=unassigned"));
-        }
+        statusCards.Add(BuildCard("unassigned", "Unassigned", unassignedCount, "?assignedAdminUserId=unassigned"));
 
         statusCards.AddRange(new[]
         {
@@ -127,6 +122,81 @@ public class DashboardService
         var categoryIds = categoryCounts.Select(x => x.CategoryId).ToList();
         var categoryData = categoryCounts.Select(x => x.Count).ToList();
 
+        var myOnTrackCount = onTrackCount;
+        var myDueSoonCount = dueSoonCount;
+        var myOverdueCount = overdueCount;
+        var myVolumeCreated14 = volumeCreated14;
+        var myVolumeClosed14 = volumeClosed14;
+        var myVolumeCreated30 = volumeCreated30;
+        var myVolumeClosed30 = volumeClosed30;
+        var myCategoryLabels = categoryLabels;
+        var myCategoryIds = categoryIds;
+        var myCategoryData = categoryData;
+
+        if (!user.IsAdmin)
+        {
+            var personalTickets = _db.Tickets
+                .AsNoTracking()
+                .Where(t => t.RequesterUserId == user.UserId);
+
+            var personalSlaCandidates = await personalTickets
+                .Where(t => t.Status != TicketStatus.Closed)
+                .Select(t => new { t.CreatedAtUtc, t.Priority })
+                .ToListAsync();
+
+            myDueSoonCount = 0;
+            myOverdueCount = 0;
+            myOnTrackCount = 0;
+            foreach (var ticket in personalSlaCandidates)
+            {
+                var slaState = SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions);
+                if (slaState == SlaState.Overdue)
+                {
+                    myOverdueCount++;
+                }
+                else if (slaState == SlaState.DueSoon)
+                {
+                    myDueSoonCount++;
+                }
+                else
+                {
+                    myOnTrackCount++;
+                }
+            }
+
+            var personalVolumeTickets = await personalTickets
+                .Where(t => t.CreatedAtUtc >= startDate || (t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate))
+                .Select(t => new { t.CreatedAtUtc, t.ClosedAtUtc })
+                .ToListAsync();
+
+            var personalCreatedLookup = personalVolumeTickets
+                .GroupBy(t => t.CreatedAtUtc.Date)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var personalClosedLookup = personalVolumeTickets
+                .Where(t => t.ClosedAtUtc.HasValue)
+                .GroupBy(t => t.ClosedAtUtc!.Value.Date)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            myVolumeCreated30 = dateRange30.Select(d => personalCreatedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+            myVolumeClosed30 = dateRange30.Select(d => personalClosedLookup.TryGetValue(d, out var count) ? count : 0).ToList();
+            myVolumeCreated14 = myVolumeCreated30.TakeLast(14).ToList();
+            myVolumeClosed14 = myVolumeClosed30.TakeLast(14).ToList();
+
+            var personalCategoryCounts = await personalTickets
+                .Include(t => t.Category)
+                .Where(t => t.Status != TicketStatus.Closed)
+                .GroupBy(t => new { t.CategoryId, t.Category!.Name })
+                .Select(g => new { g.Key.CategoryId, g.Key.Name, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .Take(5)
+                .ToListAsync();
+
+            myCategoryLabels = personalCategoryCounts.Select(x => x.Name).ToList();
+            myCategoryIds = personalCategoryCounts.Select(x => x.CategoryId).ToList();
+            myCategoryData = personalCategoryCounts.Select(x => x.Count).ToList();
+        }
+
         var myOpenTicketsQuery = _db.Tickets
             .AsNoTracking()
             .Include(t => t.Category)
@@ -173,6 +243,19 @@ public class DashboardService
                 .ToListAsync();
         }
 
+        var subscribedTickets = await _db.TicketSubscribers
+            .AsNoTracking()
+            .Include(s => s.Ticket)
+                .ThenInclude(t => t!.Category)
+            .Include(s => s.Ticket)
+                .ThenInclude(t => t!.RequesterUser)
+            .Where(s => s.UserId == user.UserId)
+            .Where(s => s.Ticket != null && s.Ticket.RequesterUserId != user.UserId)
+            .OrderByDescending(s => s.Ticket!.UpdatedAtUtc)
+            .Take(8)
+            .Select(s => s.Ticket!)
+            .ToListAsync();
+
         return new DashboardViewModel
         {
             IsAdmin = user.IsAdmin,
@@ -212,28 +295,38 @@ public class DashboardService
             NeedsAttentionEmptyMessage = user.IsAdmin
                 ? "Waiting on user or high priority tickets will show up here."
                 : "We will highlight tickets that need your input.",
+            SubscribedTickets = subscribedTickets,
+            SubscribedTicketsTitle = "Subscribed Tickets",
+            SubscribedTicketsEmptyTitle = "No subscribed tickets",
+            SubscribedTicketsEmptyMessage = "Tickets you follow will appear here.",
             OnTrackCount = onTrackCount,
             DueSoonCount = dueSoonCount,
             OverdueCount = overdueCount,
+            MyOnTrackCount = myOnTrackCount,
+            MyDueSoonCount = myDueSoonCount,
+            MyOverdueCount = myOverdueCount,
             VolumeLabels14 = volumeLabels14,
             VolumeCreatedCounts14 = volumeCreated14,
             VolumeClosedCounts14 = volumeClosed14,
             VolumeLabels30 = volumeLabels30,
             VolumeCreatedCounts30 = volumeCreated30,
             VolumeClosedCounts30 = volumeClosed30,
+            MyVolumeCreatedCounts14 = myVolumeCreated14,
+            MyVolumeClosedCounts14 = myVolumeClosed14,
+            MyVolumeCreatedCounts30 = myVolumeCreated30,
+            MyVolumeClosedCounts30 = myVolumeClosed30,
             VolumeDateKeys14 = volumeDateKeys14,
             VolumeDateKeys30 = volumeDateKeys30,
             CategoryLabels = categoryLabels,
             CategoryCounts = categoryData,
-            CategoryIds = categoryIds
+            CategoryIds = categoryIds,
+            MyCategoryLabels = myCategoryLabels,
+            MyCategoryCounts = myCategoryData,
+            MyCategoryIds = myCategoryIds
         };
     }
 
-    // All dashboard metrics must use ApplyScope(user) to avoid leaking data between roles.
-    private static IQueryable<Ticket> ApplyScope(IQueryable<Ticket> query, DashboardUserContext user)
-    {
-        return user.CanViewAll ? query : query.Where(t => t.RequesterUserId == user.UserId);
-    }
+    // All dashboard metrics must use the ticket access scope to avoid leaking data between roles.
 
     private static DashboardMetricCard BuildCard(string key, string label, int count, string filterQueryString)
     {
@@ -251,5 +344,4 @@ public class DashboardUserContext
 {
     public string UserId { get; init; } = string.Empty;
     public bool IsAdmin { get; init; }
-    public bool CanViewAll { get; init; }
 }

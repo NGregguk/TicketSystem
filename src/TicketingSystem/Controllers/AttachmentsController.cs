@@ -25,6 +25,7 @@ public class AttachmentsController : Controller
     private readonly IWebHostEnvironment _environment;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<AttachmentsController> _logger;
+    private readonly TicketAccessService _ticketAccess;
 
     public AttachmentsController(
         ApplicationDbContext db,
@@ -32,7 +33,8 @@ public class AttachmentsController : Controller
         IOptions<UploadOptions> uploadOptions,
         IWebHostEnvironment environment,
         UserManager<ApplicationUser> userManager,
-        ILogger<AttachmentsController> logger)
+        ILogger<AttachmentsController> logger,
+        TicketAccessService ticketAccess)
     {
         _db = db;
         _fileStorage = fileStorage;
@@ -40,6 +42,7 @@ public class AttachmentsController : Controller
         _environment = environment;
         _userManager = userManager;
         _logger = logger;
+        _ticketAccess = ticketAccess;
     }
 
     [HttpPost("upload-temp")]
@@ -150,8 +153,15 @@ public class AttachmentsController : Controller
         }
 
         var userId = _userManager.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
         if (!attachment.TicketId.HasValue &&
             !string.Equals(attachment.UploadedByUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
+        if (attachment.TicketId.HasValue &&
+            !await _ticketAccess.CanViewTicketAsync(userId, isAdmin, attachment.TicketId.Value))
         {
             return Forbid();
         }

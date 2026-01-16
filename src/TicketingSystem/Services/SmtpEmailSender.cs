@@ -1,7 +1,9 @@
 ﻿using System.Net;
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using TicketingSystem.Data;
 using TicketingSystem.Models;
 using TicketingSystem.Options;
 
@@ -9,17 +11,20 @@ namespace TicketingSystem.Services;
 
 public class SmtpEmailSender : IEmailSender
 {
+    private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly NotificationOptions _notificationOptions;
     private readonly SmtpOptions _smtpOptions;
     private readonly ILogger<SmtpEmailSender> _logger;
 
     public SmtpEmailSender(
+        ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IOptions<NotificationOptions> notificationOptions,
         IOptions<SmtpOptions> smtpOptions,
         ILogger<SmtpEmailSender> logger)
     {
+        _db = db;
         _userManager = userManager;
         _notificationOptions = notificationOptions.Value;
         _smtpOptions = smtpOptions.Value;
@@ -39,6 +44,8 @@ public class SmtpEmailSender : IEmailSender
         {
             recipients.Add(requesterEmail!);
         }
+
+        recipients.AddRange(await GetSubscriberEmailsAsync(ticket.Id));
 
         var subject = $"[Ticket #{ticket.Id}] Created - {ticket.Title}";
         var body = $"Ticket #{ticket.Id} was created. Status: {ticket.Status}.";
@@ -63,6 +70,8 @@ public class SmtpEmailSender : IEmailSender
             recipients.Add(requesterEmail!);
         }
 
+        recipients.AddRange(await GetSubscriberEmailsAsync(ticket.Id));
+
         var subject = $"[Ticket #{ticket.Id}] Assigned";
         var body = $"Ticket #{ticket.Id} was assigned. Status: {ticket.Status}.";
         await SendAsync(recipients, subject, body);
@@ -85,6 +94,8 @@ public class SmtpEmailSender : IEmailSender
                 recipients.Add(assignedEmail!);
             }
         }
+
+        recipients.AddRange(await GetSubscriberEmailsAsync(ticket.Id));
 
         var subject = $"[Ticket #{ticket.Id}] Status Changed";
         var body = $"Ticket #{ticket.Id} status changed from {oldStatus} to {newStatus}.";
@@ -122,6 +133,8 @@ public class SmtpEmailSender : IEmailSender
             }
         }
 
+        recipients.AddRange(await GetSubscriberEmailsAsync(ticket.Id));
+
         var subject = $"[Ticket #{ticket.Id}] New Comment";
         var body = $"A new comment was added to ticket #{ticket.Id}.";
         await SendAsync(recipients, subject, body);
@@ -131,6 +144,15 @@ public class SmtpEmailSender : IEmailSender
     {
         var user = await _userManager.FindByIdAsync(userId);
         return user?.Email;
+    }
+
+    private async Task<List<string>> GetSubscriberEmailsAsync(int ticketId)
+    {
+        return await _db.TicketSubscribers
+            .Where(s => s.TicketId == ticketId)
+            .Join(_db.Users, s => s.UserId, u => u.Id, (_, user) => user.Email)
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .ToListAsync();
     }
 
     private async Task SendAsync(IEnumerable<string> recipients, string subject, string body)

@@ -6,6 +6,7 @@ namespace TicketingSystem.ViewModels;
 public class TicketListViewModel
 {
     public IReadOnlyList<Ticket> Tickets { get; set; } = Array.Empty<Ticket>();
+    public IReadOnlyDictionary<int, int> TimeSpentByTicket { get; set; } = new Dictionary<int, int>();
     public IEnumerable<SelectListItem> Categories { get; set; } = Array.Empty<SelectListItem>();
     public IEnumerable<SelectListItem> InternalSystems { get; set; } = Array.Empty<SelectListItem>();
     public IEnumerable<SelectListItem> Statuses { get; set; } = Array.Empty<SelectListItem>();

@@ -10,10 +10,18 @@ public class TicketDetailViewModel
     public IReadOnlyList<TicketInternalNote> InternalNotes { get; set; } = Array.Empty<TicketInternalNote>();
     public IReadOnlyList<TicketAttachment> Attachments { get; set; } = Array.Empty<TicketAttachment>();
     public ISet<int> AllowedAttachmentIds { get; set; } = new HashSet<int>();
+    public IReadOnlyList<TicketSubscriberViewModel> Subscribers { get; set; } = Array.Empty<TicketSubscriberViewModel>();
+    public bool CanManageSubscribers { get; set; }
+    public IReadOnlyList<TicketTimeEntry> TimeEntries { get; set; } = Array.Empty<TicketTimeEntry>();
+    public int TotalTimeMinutes { get; set; }
 
     public string NewComment { get; set; } = string.Empty;
 
     public string? NewInternalNote { get; set; }
+
+    public int TimeEntryMinutes { get; set; }
+    public DateTime? TimeEntryWorkDate { get; set; }
+    public string? TimeEntryNote { get; set; }
 
     public string? AssignToUserId { get; set; }
     public TicketStatus? NewStatus { get; set; }

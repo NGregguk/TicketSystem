@@ -17,6 +17,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketInternalNote> TicketInternalNotes => Set<TicketInternalNote>();
     public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
+    public DbSet<TicketSubscriber> TicketSubscribers => Set<TicketSubscriber>();
+    public DbSet<TicketEvent> TicketEvents => Set<TicketEvent>();
+    public DbSet<TicketTimeEntry> TicketTimeEntries => Set<TicketTimeEntry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -100,6 +103,56 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(x => x.UploadedByUser)
                 .WithMany()
                 .HasForeignKey(x => x.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<TicketSubscriber>(entity =>
+        {
+            entity.HasIndex(x => new { x.TicketId, x.UserId }).IsUnique();
+
+            entity.HasOne(x => x.Ticket)
+                .WithMany(t => t.Subscribers)
+                .HasForeignKey(x => x.TicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.AddedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.AddedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<TicketEvent>(entity =>
+        {
+            entity.HasOne(x => x.Ticket)
+                .WithMany(t => t.Events)
+                .HasForeignKey(x => x.TicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ActorUser)
+                .WithMany()
+                .HasForeignKey(x => x.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<TicketTimeEntry>(entity =>
+        {
+            entity.HasIndex(x => x.TicketId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.WorkDate);
+
+            entity.HasOne(x => x.Ticket)
+                .WithMany(t => t.TimeEntries)
+                .HasForeignKey(x => x.TicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

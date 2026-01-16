@@ -36,8 +36,7 @@
                             <th>Status</th>
                             <th>Priority</th>
                             <th>Category</th>
-                            <th>System</th>
-                            <th>Age</th>
+                            <th>Time Spent</th>
                             <th>SLA</th>
                             <th>Updated</th>
                             <th>Assigned</th>
@@ -56,8 +55,7 @@
                                 <td>@await Html.PartialAsync("_BadgeStatus", ticket.Status)</td>
                                 <td>@await Html.PartialAsync("_BadgePriority", ticket.Priority)</td>
                                 <td>@ticket.Category?.Name</td>
-                                <td>@ticket.InternalSystem?.Name</td>
-                                <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
+                                <td>@TimeFormatHelper.FormatMinutes(Model.TimeSpentByTicket.TryGetValue(ticket.Id, out var minutes) ? minutes : 0)</td>
                                 <td>@await Html.PartialAsync("_SlaBadge", ticket)</td>
                                 <td>@ticket.UpdatedAtUtc.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
                                 <td>@(string.IsNullOrWhiteSpace(ticket.AssignedAdminUser?.DisplayName) ? (ticket.AssignedAdminUser?.Email ?? "Unassigned") : ticket.AssignedAdminUser?.DisplayName)</td>

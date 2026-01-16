@@ -16,7 +16,7 @@
 
 <div class="section-divider"><span>Overview</span></div>
 
-<div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+<div class="row row-cols-2 row-cols-lg-5 g-3 mb-4">
     <div class="col">
         <div class="card report-kpi @(Model.TotalOpenCount == 0 ? "metric-card-zero" : "")">
             <div class="card-body">
@@ -46,6 +46,14 @@
             <div class="card-body">
                 <div class="report-kpi-label">Overdue</div>
                 <div class="report-kpi-value">@Model.OverdueCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card report-kpi @(Model.TimeLoggedMinutes30 == 0 ? "metric-card-zero" : "")">
+            <div class="card-body">
+                <div class="report-kpi-label">Time Logged (30d)</div>
+                <div class="report-kpi-value">@TimeFormatHelper.FormatMinutes(Model.TimeLoggedMinutes30)</div>
             </div>
         </div>
     </div>
@@ -126,6 +134,48 @@
                                         <td>@ticket.Title</td>
                                         <td>@ticket.Category</td>
                                         <td>@SlaHelper.FormatAge(ticket.CreatedAtUtc, DateTime.UtcNow)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header section-title">Top Tickets by Time (30d)</div>
+            <div class="card-body">
+                @if (!Model.TopTimeTickets.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+                    {
+                        Title = "No time logged",
+                        Message = "Time entries from the last 30 days will appear here."
+                    })
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Time Logged</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in Model.TopTimeTickets)
+                                {
+                                    <tr data-row-link data-href="@Url.Action("Details", "Tickets", new { id = ticket.Id })">
+                                        <td class="fw-semibold">#@ticket.Id</td>
+                                        <td>@ticket.Title</td>
+                                        <td>@TimeFormatHelper.FormatMinutes(ticket.Minutes)</td>
                                     </tr>
                                 }
                             </tbody>

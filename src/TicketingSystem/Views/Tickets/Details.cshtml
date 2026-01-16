@@ -4,7 +4,8 @@
     var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
     var isAdmin = User.IsInRole(RoleNames.Admin);
     var isRequester = Model.Ticket.RequesterUserId == currentUserId;
-    var canInteract = isAdmin || isRequester;
+    var isSubscriber = Model.Subscribers.Any(s => s.UserId == currentUserId);
+    var canInteract = isAdmin || isRequester || isSubscriber;
     var roleLabel = isAdmin ? "admin" : "requester";
     var header = new PageHeaderViewModel
     {
@@ -181,6 +182,122 @@
             </button>
         </div>
         <div class="ticket-sidebar-body">
+            <details class="ticket-panel mb-3" open>
+                <summary class="ticket-panel-summary">Time Spent</summary>
+                <div class="ticket-panel-content">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="fw-semibold">Total: @TimeFormatHelper.FormatMinutes(Model.TotalTimeMinutes)</div>
+                        @if (isAdmin)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#time-entry-form"
+                                    aria-expanded="false"
+                                    aria-controls="time-entry-form">
+                                Add time
+                            </button>
+                        }
+                    </div>
+
+                    @if (isAdmin)
+                    {
+                        <div class="collapse mb-3" id="time-entry-form">
+                            <form asp-action="AddTimeEntry" asp-route-id="@Model.Ticket.Id" method="post" data-disable-on-submit>
+                                <div class="mb-2">
+                                    <label class="form-label">Minutes</label>
+                                    <input type="number" class="form-control" name="TimeEntryMinutes" min="1" max="1440" required />
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Work date</label>
+                                    <input type="date" class="form-control" name="TimeEntryWorkDate" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Note (optional)</label>
+                                    <input type="text" class="form-control" name="TimeEntryNote" maxlength="200" />
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-primary" type="submit" data-loading-text="Saving...">Save Entry</button>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#time-entry-form"
+                                            aria-expanded="true"
+                                            aria-controls="time-entry-form">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    }
+
+                    @if (!Model.TimeEntries.Any())
+                    {
+                        <div class="text-muted">No time entries yet.</div>
+                    }
+                    else
+                    {
+                        <div class="comment-timeline">
+                            @foreach (var entry in Model.TimeEntries)
+                            {
+                                <div class="comment-card">
+                                    <div class="comment-header">
+                                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(entry.User?.DisplayName) ? entry.User?.Email : entry.User?.DisplayName)</div>
+                                        <div class="ticket-meta">@entry.WorkDate.ToLocalTime().ToString("MMM d, yyyy")</div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div>@TimeFormatHelper.FormatMinutes(entry.Minutes)</div>
+                                        @if (!string.IsNullOrWhiteSpace(entry.Note))
+                                        {
+                                            <div class="ticket-meta">@entry.Note</div>
+                                        }
+                                    </div>
+                                    @if (isAdmin)
+                                    {
+                                        <div class="mt-2 d-flex gap-2">
+                                            <button class="btn btn-link btn-sm p-0 edit-link" type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#edit-time-@entry.Id"
+                                                    aria-expanded="false"
+                                                    aria-controls="edit-time-@entry.Id">
+                                                Edit
+                                            </button>
+                                            <form asp-action="DeleteTimeEntry" asp-route-id="@Model.Ticket.Id" asp-route-entryId="@entry.Id" method="post" data-disable-on-submit>
+                                                <button class="btn btn-link btn-sm p-0 text-danger" type="submit" data-confirm="Delete this time entry?">Delete</button>
+                                            </form>
+                                        </div>
+                                        <div class="collapse mt-3" id="edit-time-@entry.Id">
+                                            <form asp-action="EditTimeEntry" asp-route-id="@Model.Ticket.Id" asp-route-entryId="@entry.Id" method="post" data-disable-on-submit>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Minutes</label>
+                                                    <input type="number" class="form-control" name="minutes" min="1" max="1440" value="@entry.Minutes" required />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Work date</label>
+                                                    <input type="date" class="form-control" name="workDate" value="@entry.WorkDate.ToString("yyyy-MM-dd")" />
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Note (optional)</label>
+                                                    <input type="text" class="form-control" name="note" maxlength="200" value="@entry.Note" />
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-sm btn-outline-secondary" type="submit" data-loading-text="Saving...">Save Changes</button>
+                                                    <button class="btn btn-sm btn-light" type="button"
+                                                            data-bs-toggle="collapse"
+                                                            data-bs-target="#edit-time-@entry.Id"
+                                                            aria-expanded="true"
+                                                            aria-controls="edit-time-@entry.Id">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </details>
+
             @if (User.IsInRole(RoleNames.Admin))
             {
                 <details class="ticket-panel mb-3" open>
@@ -308,6 +425,53 @@
                 </div>
             </details>
 
+            <details class="ticket-panel mb-3" open>
+                <summary class="ticket-panel-summary">Subscribers</summary>
+                <div class="ticket-panel-content" data-ticket-id="@Model.Ticket.Id">
+                    <div class="ticket-meta mb-2">Subscribers can view this ticket and receive updates.</div>
+                    <div class="subscriber-list" id="subscriber-list">
+                        @if (!Model.Subscribers.Any())
+                        {
+                            <div class="text-muted">No subscribers yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (var subscriber in Model.Subscribers)
+                            {
+                                <div class="subscriber-item">
+                                    <div>
+                                        <div class="fw-semibold">@subscriber.DisplayName</div>
+                                        <div class="ticket-meta">@subscriber.Email</div>
+                                    </div>
+                                    @if (Model.CanManageSubscribers)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger subscriber-remove"
+                                                type="button"
+                                                data-user-id="@subscriber.UserId">
+                                            Remove
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    @if (Model.CanManageSubscribers)
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Add subscriber</label>
+                            <input class="form-control" id="subscriber-search" type="text" placeholder="Search by name or email" autocomplete="off" />
+                            <div class="subscriber-results" id="subscriber-results" hidden></div>
+                            <div class="form-text">Start typing to find a user.</div>
+                            <div class="subscriber-feedback text-muted mt-2" id="subscriber-feedback"></div>
+                            <form id="subscriber-antiforgery">
+                                @Html.AntiForgeryToken()
+                            </form>
+                        </div>
+                    }
+                </div>
+            </details>
+
             @if (User.IsInRole(RoleNames.Admin))
             {
                 <details class="ticket-panel note-card" open>
@@ -418,7 +582,7 @@
         const sidebar = document.getElementById("ticket-sidebar");
         const toggle = document.querySelector(".ticket-sidebar-toggle");
         const handle = document.getElementById("ticket-sidebar-handle");
-        const storageKey = "ticketSidebarCollapsed";
+        const storageKey = "ticketSidebarCollapsed_v2";
 
         const setCollapsed = (collapsed) => {
             if (!layout || !sidebar || !toggle || !handle) {
@@ -436,7 +600,7 @@
         if (layout && sidebar && toggle && handle) {
             const isMobile = window.matchMedia("(max-width: 991px)").matches;
             const stored = localStorage.getItem(storageKey);
-            const defaultCollapsed = isMobile ? true : layout.dataset.role !== "admin";
+            const defaultCollapsed = true;
             const collapsed = stored === null ? defaultCollapsed : stored === "true";
             setCollapsed(collapsed);
 
@@ -446,6 +610,165 @@
 
             handle.addEventListener("click", () => {
                 setCollapsed(!layout.classList.contains("is-collapsed"));
+            });
+        }
+    </script>
+    <script>
+        const subscriberList = document.getElementById("subscriber-list");
+        const subscriberResults = document.getElementById("subscriber-results");
+        const subscriberSearch = document.getElementById("subscriber-search");
+        const subscriberFeedback = document.getElementById("subscriber-feedback");
+        const subscriberContainer = document.querySelector(".ticket-panel-content[data-ticket-id]");
+        const subscriberForm = document.getElementById("subscriber-antiforgery");
+        const ticketId = subscriberContainer?.getAttribute("data-ticket-id");
+
+        const getAntiForgeryToken = () => {
+            const input = subscriberForm?.querySelector("input[name='__RequestVerificationToken']");
+            return input?.value || "";
+        };
+
+        const renderSubscribers = (items) => {
+            if (!subscriberList) {
+                return;
+            }
+            if (!items || items.length === 0) {
+                subscriberList.innerHTML = "<div class=\"text-muted\">No subscribers yet.</div>";
+                return;
+            }
+
+            subscriberList.innerHTML = items.map((item) => {
+                const removeButton = @Model.CanManageSubscribers.ToString().ToLowerInvariant()
+                    ? `<button class="btn btn-sm btn-outline-danger subscriber-remove" type="button" data-user-id="${item.userId}">Remove</button>`
+                    : "";
+                return `
+                    <div class="subscriber-item">
+                        <div>
+                            <div class="fw-semibold">${item.displayName}</div>
+                            <div class="ticket-meta">${item.email || ""}</div>
+                        </div>
+                        ${removeButton}
+                    </div>`;
+            }).join("");
+        };
+
+        const setFeedback = (message) => {
+            if (!subscriberFeedback) {
+                return;
+            }
+            subscriberFeedback.textContent = message || "";
+        };
+
+        const updateResults = (items) => {
+            if (!subscriberResults) {
+                return;
+            }
+            if (!items || items.length === 0) {
+                subscriberResults.hidden = true;
+                subscriberResults.innerHTML = "";
+                return;
+            }
+            subscriberResults.hidden = false;
+            subscriberResults.innerHTML = items.map((item) => `
+                <button class="subscriber-result-item" type="button" data-user-id="${item.userId}">
+                    <span>${item.displayName}</span>
+                    <span class="ticket-meta">${item.email || ""}</span>
+                </button>
+            `).join("");
+        };
+
+        const searchUsers = async (term) => {
+            if (!subscriberResults || !ticketId) {
+                return;
+            }
+            if (!term || term.length < 2) {
+                updateResults([]);
+                return;
+            }
+            const response = await fetch(`/users/search?q=${encodeURIComponent(term)}&ticketId=${ticketId}`);
+            if (!response.ok) {
+                updateResults([]);
+                return;
+            }
+            const data = await response.json();
+            updateResults(data);
+        };
+
+        const addSubscriber = async (userId) => {
+            if (!ticketId) {
+                return;
+            }
+            setFeedback("");
+            const response = await fetch(`/tickets/${ticketId}/subscribers`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "RequestVerificationToken": getAntiForgeryToken()
+                },
+                body: JSON.stringify({ userId })
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                setFeedback(payload.error || "Unable to add subscriber.");
+                return;
+            }
+
+            const updated = await response.json();
+            renderSubscribers(updated);
+            updateResults([]);
+            if (subscriberSearch) {
+                subscriberSearch.value = "";
+            }
+            setFeedback("Subscriber added.");
+        };
+
+        const removeSubscriber = async (userId) => {
+            if (!ticketId) {
+                return;
+            }
+            setFeedback("");
+            const response = await fetch(`/tickets/${ticketId}/subscribers/${encodeURIComponent(userId)}`, {
+                method: "DELETE",
+                headers: {
+                    "RequestVerificationToken": getAntiForgeryToken()
+                }
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                setFeedback(payload.error || "Unable to remove subscriber.");
+                return;
+            }
+
+            const updated = await response.json();
+            renderSubscribers(updated);
+            setFeedback("Subscriber removed.");
+        };
+
+        if (subscriberSearch) {
+            let searchTimer = 0;
+            subscriberSearch.addEventListener("input", (event) => {
+                window.clearTimeout(searchTimer);
+                const term = event.target.value;
+                searchTimer = window.setTimeout(() => searchUsers(term), 250);
+            });
+        }
+
+        if (subscriberResults) {
+            subscriberResults.addEventListener("click", (event) => {
+                const target = event.target.closest(".subscriber-result-item");
+                if (target) {
+                    addSubscriber(target.getAttribute("data-user-id"));
+                }
+            });
+        }
+
+        if (subscriberList) {
+            subscriberList.addEventListener("click", (event) => {
+                const target = event.target.closest(".subscriber-remove");
+                if (target) {
+                    removeSubscriber(target.getAttribute("data-user-id"));
+                }
             });
         }
     </script>

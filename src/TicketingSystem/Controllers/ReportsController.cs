@@ -7,6 +7,7 @@ using TicketingSystem.Data;
 using TicketingSystem.Helpers;
 using TicketingSystem.Models;
 using TicketingSystem.Options;
+using TicketingSystem.Services;
 using TicketingSystem.ViewModels;
 
 namespace TicketingSystem.Controllers;
@@ -16,11 +17,13 @@ public class ReportsController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly SlaOptions _slaOptions;
+    private readonly TicketAccessService _ticketAccess;
 
-    public ReportsController(ApplicationDbContext db, IOptions<SlaOptions> slaOptions)
+    public ReportsController(ApplicationDbContext db, IOptions<SlaOptions> slaOptions, TicketAccessService ticketAccess)
     {
         _db = db;
         _slaOptions = slaOptions.Value;
+        _ticketAccess = ticketAccess;
     }
 
     public async Task<IActionResult> Index()
@@ -32,8 +35,7 @@ public class ReportsController : Controller
     [HttpGet]
     public async Task<IActionResult> ExportCsv()
     {
-        var tickets = await _db.Tickets
-            .AsNoTracking()
+        var tickets = await GetScopedTickets()
             .Include(t => t.Category)
             .Include(t => t.InternalSystem)
             .Include(t => t.RequesterUser)
@@ -41,8 +43,15 @@ public class ReportsController : Controller
             .OrderByDescending(t => t.CreatedAtUtc)
             .ToListAsync();
 
+        var timeTotals = await _db.TicketTimeEntries
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted)
+            .GroupBy(e => e.TicketId)
+            .Select(g => new { TicketId = g.Key, Minutes = g.Sum(x => x.Minutes) })
+            .ToDictionaryAsync(x => x.TicketId, x => x.Minutes);
+
         var builder = new StringBuilder();
-        builder.AppendLine("Id,Title,Status,Priority,Category,InternalSystem,Requester,AssignedAdmin,CreatedAtUtc,UpdatedAtUtc,ClosedAtUtc,SlaState");
+        builder.AppendLine("Id,Title,Status,Priority,Category,InternalSystem,Requester,AssignedAdmin,CreatedAtUtc,UpdatedAtUtc,ClosedAtUtc,SlaState,TotalTimeMinutes,TotalTimeFormatted");
 
         foreach (var ticket in tickets)
         {
@@ -51,6 +60,8 @@ public class ReportsController : Controller
             var slaState = ticket.Status == TicketStatus.Closed
                 ? "Closed"
                 : SlaHelper.GetSlaState(ticket.CreatedAtUtc, ticket.Priority, _slaOptions).ToString();
+            var totalMinutes = timeTotals.TryGetValue(ticket.Id, out var minutes) ? minutes : 0;
+            var totalFormatted = TimeFormatHelper.FormatMinutes(totalMinutes);
 
             builder.AppendLine(string.Join(",",
                 ticket.Id,
@@ -64,7 +75,9 @@ public class ReportsController : Controller
                 ticket.CreatedAtUtc.ToString("O"),
                 ticket.UpdatedAtUtc.ToString("O"),
                 ticket.ClosedAtUtc?.ToString("O") ?? string.Empty,
-                slaState));
+                slaState,
+                totalMinutes,
+                EscapeCsv(totalFormatted)));
         }
 
         var bytes = Encoding.UTF8.GetBytes(builder.ToString());
@@ -78,8 +91,9 @@ public class ReportsController : Controller
         var startDate = nowUtc.Date.AddDays(-29);
         var endDate = nowUtc.Date;
 
-        var volumeTickets = await _db.Tickets
-            .AsNoTracking()
+        var scopedTickets = GetScopedTickets();
+
+        var volumeTickets = await scopedTickets
             .Where(t => t.CreatedAtUtc >= startDate || (t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate))
             .Select(t => new { t.CreatedAtUtc, t.ClosedAtUtc })
             .ToListAsync();
@@ -106,8 +120,7 @@ public class ReportsController : Controller
         var volumeCreated14 = volumeCreated.TakeLast(14).ToList();
         var volumeClosed14 = volumeClosed.TakeLast(14).ToList();
 
-        var slaCandidates = await _db.Tickets
-            .AsNoTracking()
+        var slaCandidates = await scopedTickets
             .Where(t => t.Status != TicketStatus.Closed)
             .Select(t => new { t.CreatedAtUtc, t.Priority })
             .ToListAsync();
@@ -132,8 +145,7 @@ public class ReportsController : Controller
             }
         }
 
-        var workloadTickets = await _db.Tickets
-            .AsNoTracking()
+        var workloadTickets = await scopedTickets
             .Include(t => t.AssignedAdminUser)
             .Where(t => t.Status != TicketStatus.Closed)
             .ToListAsync();
@@ -157,8 +169,7 @@ public class ReportsController : Controller
             .ThenBy(x => x.Name)
             .ToList();
 
-        var unassignedTickets = await _db.Tickets
-            .AsNoTracking()
+        var unassignedTickets = await scopedTickets
             .Include(t => t.Category)
             .Where(t => t.AssignedAdminUserId == null && t.Status != TicketStatus.Closed)
             .OrderBy(t => t.CreatedAtUtc)
@@ -172,8 +183,30 @@ public class ReportsController : Controller
             })
             .ToListAsync();
 
-        var totalOpenCount = await _db.Tickets.CountAsync(t => t.Status != TicketStatus.Closed);
-        var closedLast30Days = await _db.Tickets.CountAsync(t => t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate);
+        var timeEntryQuery = _db.TicketTimeEntries
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && e.WorkDate >= startDate);
+
+        var ticketIds = await scopedTickets.Select(t => t.Id).ToListAsync();
+        timeEntryQuery = timeEntryQuery.Where(e => ticketIds.Contains(e.TicketId));
+
+        var timeLoggedMinutes30 = await timeEntryQuery.SumAsync(e => e.Minutes);
+
+        var topTimeTickets = await timeEntryQuery
+            .GroupBy(e => e.TicketId)
+            .Select(g => new { TicketId = g.Key, Minutes = g.Sum(x => x.Minutes) })
+            .OrderByDescending(x => x.Minutes)
+            .Take(10)
+            .Join(scopedTickets, g => g.TicketId, t => t.Id, (g, t) => new ReportsTimeTicketItem
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Minutes = g.Minutes
+            })
+            .ToListAsync();
+
+        var totalOpenCount = await scopedTickets.CountAsync(t => t.Status != TicketStatus.Closed);
+        var closedLast30Days = await scopedTickets.CountAsync(t => t.ClosedAtUtc != null && t.ClosedAtUtc >= startDate);
 
         return new ReportsViewModel
         {
@@ -185,6 +218,8 @@ public class ReportsController : Controller
             OnTrackCount = onTrackCount,
             DueSoonCount = dueSoonCount,
             OverdueCount = overdueCount,
+            TimeLoggedMinutes30 = timeLoggedMinutes30,
+            TopTimeTickets = topTimeTickets,
             VolumeLabels = volumeLabels,
             VolumeCreatedCounts = volumeCreated,
             VolumeClosedCounts = volumeClosed,
@@ -209,5 +244,12 @@ public class ReportsController : Controller
         return escaped.Contains(',') || escaped.Contains('"') || escaped.Contains('\n')
             ? $"\"{escaped}\""
             : escaped;
+    }
+
+    private IQueryable<Ticket> GetScopedTickets()
+    {
+        var userId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        return _ticketAccess.ApplyViewScope(_db.Tickets.AsNoTracking(), userId, isAdmin);
     }
 }

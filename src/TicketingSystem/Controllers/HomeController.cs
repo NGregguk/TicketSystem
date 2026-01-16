@@ -25,8 +25,7 @@ public class HomeController : Controller
         var viewModel = await _dashboardService.GetDashboardAsync(new DashboardUserContext
         {
             UserId = userId,
-            IsAdmin = User.IsInRole(RoleNames.Admin),
-            CanViewAll = true
+            IsAdmin = User.IsInRole(RoleNames.Admin)
         });
 
         return View(viewModel);

@@ -23,6 +23,7 @@ public class TicketsController : Controller
     private readonly IEmailSender _emailSender;
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<TicketsController> _logger;
+    private readonly TicketAccessService _ticketAccess;
     private readonly SlaOptions _slaOptions;
     private readonly UploadOptions _uploadOptions;
     private readonly IWebHostEnvironment _environment;
@@ -33,6 +34,7 @@ public class TicketsController : Controller
         IEmailSender emailSender,
         IFileStorage fileStorage,
         ILogger<TicketsController> logger,
+        TicketAccessService ticketAccess,
         IOptions<SlaOptions> slaOptions,
         IOptions<UploadOptions> uploadOptions,
         IWebHostEnvironment environment)
@@ -42,6 +44,7 @@ public class TicketsController : Controller
         _emailSender = emailSender;
         _fileStorage = fileStorage;
         _logger = logger;
+        _ticketAccess = ticketAccess;
         _slaOptions = slaOptions.Value;
         _uploadOptions = uploadOptions.Value;
         _environment = environment;
@@ -71,6 +74,10 @@ public class TicketsController : Controller
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
             .AsQueryable();
+
+        var userId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        query = _ticketAccess.ApplyViewScope(query, userId, isAdmin);
 
         if (categoryId.HasValue)
         {
@@ -174,6 +181,14 @@ public class TicketsController : Controller
             .Take(effectivePageSize)
             .ToListAsync();
 
+        var ticketIds = tickets.Select(t => t.Id).ToList();
+        var timeSpentByTicket = await _db.TicketTimeEntries
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && ticketIds.Contains(e.TicketId))
+            .GroupBy(e => e.TicketId)
+            .Select(g => new { TicketId = g.Key, Minutes = g.Sum(x => x.Minutes) })
+            .ToDictionaryAsync(x => x.TicketId, x => x.Minutes);
+
         var categories = await _db.Categories
             .Where(c => c.IsActive)
             .OrderBy(c => c.Name)
@@ -191,6 +206,7 @@ public class TicketsController : Controller
         var viewModel = new TicketListViewModel
         {
             Tickets = tickets,
+            TimeSpentByTicket = timeSpentByTicket,
             Categories = categories.Select(c => new SelectListItem(c.Name, c.Id.ToString())),
             InternalSystems = internalSystems.Select(s => new SelectListItem(s.Name, s.Id.ToString())),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString())),
@@ -341,6 +357,12 @@ public class TicketsController : Controller
             .Include(t => t.InternalSystem)
             .Include(t => t.RequesterUser)
             .Include(t => t.AssignedAdminUser)
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.User)
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.AddedByUser)
+            .Include(t => t.TimeEntries)
+                .ThenInclude(e => e.User)
             .Include(t => t.Comments)
                 .ThenInclude(c => c.AuthorUser)
             .Include(t => t.InternalNotes)
@@ -352,6 +374,13 @@ public class TicketsController : Controller
         if (ticket == null)
         {
             return NotFound();
+        }
+
+        var userId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!await _ticketAccess.CanViewTicketAsync(userId, isAdmin, ticket))
+        {
+            return Forbid();
         }
 
         var adminUsers = await _userManager.GetUsersInRoleAsync(RoleNames.Admin);
@@ -371,6 +400,24 @@ public class TicketsController : Controller
             InternalNotes = ticket.InternalNotes.OrderByDescending(n => n.CreatedAtUtc).ToList(),
             Attachments = ticket.Attachments.OrderByDescending(a => a.UploadedAtUtc).ToList(),
             AllowedAttachmentIds = ticket.Attachments.Select(a => a.Id).ToHashSet(),
+            Subscribers = ticket.Subscribers
+                .OrderBy(s => s.User == null ? s.UserId : (s.User.DisplayName ?? s.User.Email ?? s.User.UserName ?? s.UserId))
+                .Select(s => new TicketSubscriberViewModel
+                {
+                    UserId = s.UserId,
+                    DisplayName = s.User?.DisplayName ?? s.User?.Email ?? s.User?.UserName ?? s.UserId,
+                    Email = s.User?.Email ?? string.Empty,
+                    AddedByName = s.AddedByUser?.DisplayName ?? s.AddedByUser?.Email ?? s.AddedByUser?.UserName ?? s.AddedByUserId,
+                    CreatedAtUtc = s.CreatedAtUtc
+                })
+                .ToList(),
+            CanManageSubscribers = _ticketAccess.CanManageSubscribers(userId, isAdmin, ticket),
+            TimeEntries = ticket.TimeEntries
+                .Where(e => !e.IsDeleted)
+                .OrderByDescending(e => e.WorkDate)
+                .ThenByDescending(e => e.CreatedAtUtc)
+                .ToList(),
+            TotalTimeMinutes = ticket.TimeEntries.Where(e => !e.IsDeleted).Sum(e => e.Minutes),
             Admins = adminUsers.Select(u => new SelectListItem(u.DisplayName ?? u.Email, u.Id, u.Id == ticket.AssignedAdminUserId)),
             Statuses = Enum.GetValues<TicketStatus>().Select(s => new SelectListItem(s.ToString(), s.ToString(), s == ticket.Status)),
             Priorities = Enum.GetValues<TicketPriority>().Select(p => new SelectListItem(p.ToString(), p.ToString(), p == ticket.Priority)),
@@ -397,9 +444,15 @@ public class TicketsController : Controller
         }
 
         var userId = _userManager.GetUserId(User) ?? string.Empty;
-        if (!User.IsInRole(RoleNames.Admin) && ticket.RequesterUserId != userId)
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!isAdmin && ticket.RequesterUserId != userId)
         {
-            return Forbid();
+            var isSubscriber = await _db.TicketSubscribers
+                .AnyAsync(s => s.TicketId == id && s.UserId == userId);
+            if (!isSubscriber)
+            {
+                return Forbid();
+            }
         }
 
         var comment = new TicketComment
@@ -772,6 +825,13 @@ public class TicketsController : Controller
             return NotFound();
         }
 
+        var userId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!await _ticketAccess.CanViewTicketAsync(userId, isAdmin, ticket))
+        {
+            return Forbid();
+        }
+
         var attachment = await _db.TicketAttachments.FirstOrDefaultAsync(a => a.Id == attachmentId && a.TicketId == id);
         if (attachment == null)
         {
@@ -793,6 +853,247 @@ public class TicketsController : Controller
             : attachment.ContentType;
 
         return PhysicalFile(fullPath, contentType, attachment.OriginalFileName);
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("/tickets/{id:int}/time")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTimeEntry(int id, TicketDetailViewModel model)
+    {
+        if (model.TimeEntryMinutes <= 0 || model.TimeEntryMinutes > 1440)
+        {
+            TempData["Error"] = "Time must be between 1 and 1440 minutes.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var ticket = await _db.Tickets.FindAsync(id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        var entry = new TicketTimeEntry
+        {
+            TicketId = id,
+            UserId = _userManager.GetUserId(User) ?? string.Empty,
+            Minutes = model.TimeEntryMinutes,
+            WorkDate = (model.TimeEntryWorkDate ?? DateTime.UtcNow.Date).Date,
+            Note = string.IsNullOrWhiteSpace(model.TimeEntryNote) ? null : model.TimeEntryNote.Trim(),
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TicketTimeEntries.Add(entry);
+        _db.TicketEvents.Add(new TicketEvent
+        {
+            TicketId = id,
+            ActorUserId = entry.UserId,
+            EventType = "TimeEntryAdded",
+            Message = $"Time entry added: {entry.Minutes}m.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Time entry added.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("/tickets/{id:int}/time/{entryId:int}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditTimeEntry(int id, int entryId, int minutes, DateTime workDate, string? note)
+    {
+        if (minutes <= 0 || minutes > 1440)
+        {
+            TempData["Error"] = "Time must be between 1 and 1440 minutes.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        var entry = await _db.TicketTimeEntries
+            .FirstOrDefaultAsync(e => e.Id == entryId && e.TicketId == id && !e.IsDeleted);
+        if (entry == null)
+        {
+            return NotFound();
+        }
+
+        entry.Minutes = minutes;
+        entry.WorkDate = workDate.Date;
+        entry.Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        entry.UpdatedAtUtc = DateTime.UtcNow;
+
+        _db.TicketEvents.Add(new TicketEvent
+        {
+            TicketId = id,
+            ActorUserId = _userManager.GetUserId(User) ?? string.Empty,
+            EventType = "TimeEntryUpdated",
+            Message = $"Time entry updated: {entry.Minutes}m.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Time entry updated.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [Authorize(Roles = RoleNames.Admin)]
+    [HttpPost("/tickets/{id:int}/time/{entryId:int}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteTimeEntry(int id, int entryId)
+    {
+        var entry = await _db.TicketTimeEntries
+            .FirstOrDefaultAsync(e => e.Id == entryId && e.TicketId == id && !e.IsDeleted);
+        if (entry == null)
+        {
+            return NotFound();
+        }
+
+        entry.IsDeleted = true;
+        entry.UpdatedAtUtc = DateTime.UtcNow;
+
+        _db.TicketEvents.Add(new TicketEvent
+        {
+            TicketId = id,
+            ActorUserId = _userManager.GetUserId(User) ?? string.Empty,
+            EventType = "TimeEntryDeleted",
+            Message = $"Time entry deleted: {entry.Minutes}m.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Time entry removed.";
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
+    [HttpGet("/tickets/{id:int}/subscribers")]
+    public async Task<IActionResult> GetSubscribers(int id)
+    {
+        var ticket = await _db.Tickets
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.User)
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.AddedByUser)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        var userId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!await _ticketAccess.CanViewTicketAsync(userId, isAdmin, ticket))
+        {
+            return Forbid();
+        }
+
+        return Ok(BuildSubscriberList(ticket));
+    }
+
+    [HttpPost("/tickets/{id:int}/subscribers")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddSubscriber(int id, [FromBody] AddSubscriberRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return BadRequest(new { error = "User is required." });
+        }
+
+        var ticket = await _db.Tickets
+            .Include(t => t.Subscribers)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        var currentUserId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!_ticketAccess.CanManageSubscribers(currentUserId, isAdmin, ticket))
+        {
+            return Forbid();
+        }
+
+        var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId);
+        if (targetUser == null)
+        {
+            return NotFound(new { error = "User not found." });
+        }
+
+        var alreadySubscribed = await _db.TicketSubscribers.AnyAsync(s => s.TicketId == id && s.UserId == request.UserId);
+        if (alreadySubscribed)
+        {
+            return Conflict(new { error = "User is already subscribed." });
+        }
+
+        var subscriber = new TicketSubscriber
+        {
+            TicketId = id,
+            UserId = request.UserId,
+            AddedByUserId = currentUserId,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _db.TicketSubscribers.Add(subscriber);
+        _db.TicketEvents.Add(new TicketEvent
+        {
+            TicketId = id,
+            ActorUserId = currentUserId,
+            EventType = TicketEventTypes.SubscriberAdded,
+            Message = $"{targetUser.DisplayName ?? targetUser.Email ?? targetUser.UserName ?? targetUser.Id} added as subscriber.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Subscriber {SubscriberId} added to ticket {TicketId}", subscriber.UserId, id);
+
+        var updated = await LoadSubscribersForTicket(id);
+        return Ok(updated);
+    }
+
+    [HttpDelete("/tickets/{id:int}/subscribers/{userId}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveSubscriber(int id, string userId)
+    {
+        var ticket = await _db.Tickets
+            .Include(t => t.Subscribers)
+            .FirstOrDefaultAsync(t => t.Id == id);
+        if (ticket == null)
+        {
+            return NotFound();
+        }
+
+        var currentUserId = _ticketAccess.GetUserId(User) ?? string.Empty;
+        var isAdmin = User.IsInRole(RoleNames.Admin);
+        if (!_ticketAccess.CanManageSubscribers(currentUserId, isAdmin, ticket))
+        {
+            return Forbid();
+        }
+
+        var subscriber = await _db.TicketSubscribers
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.TicketId == id && s.UserId == userId);
+        if (subscriber == null)
+        {
+            return NotFound();
+        }
+
+        _db.TicketSubscribers.Remove(subscriber);
+        _db.TicketEvents.Add(new TicketEvent
+        {
+            TicketId = id,
+            ActorUserId = currentUserId,
+            EventType = TicketEventTypes.SubscriberRemoved,
+            Message = $"{subscriber.User?.DisplayName ?? subscriber.User?.Email ?? subscriber.User?.UserName ?? subscriber.UserId} removed from subscribers.",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Subscriber {SubscriberId} removed from ticket {TicketId}", subscriber.UserId, id);
+
+        var updated = await LoadSubscribersForTicket(id);
+        return Ok(updated);
     }
 
     private async Task PromoteTempAttachmentsAsync(int ticketId, string userId, string tempKey)
@@ -839,5 +1140,37 @@ public class TicketsController : Controller
         }
 
         await _db.SaveChangesAsync();
+    }
+
+    private async Task<List<TicketSubscriberViewModel>> LoadSubscribersForTicket(int ticketId)
+    {
+        var ticket = await _db.Tickets
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.User)
+            .Include(t => t.Subscribers)
+                .ThenInclude(s => s.AddedByUser)
+            .FirstOrDefaultAsync(t => t.Id == ticketId);
+
+        return ticket == null ? new List<TicketSubscriberViewModel>() : BuildSubscriberList(ticket);
+    }
+
+    private static List<TicketSubscriberViewModel> BuildSubscriberList(Ticket ticket)
+    {
+        return ticket.Subscribers
+            .OrderBy(s => s.User == null ? s.UserId : (s.User.DisplayName ?? s.User.Email ?? s.User.UserName ?? s.UserId))
+            .Select(s => new TicketSubscriberViewModel
+            {
+                UserId = s.UserId,
+                DisplayName = s.User?.DisplayName ?? s.User?.Email ?? s.User?.UserName ?? s.UserId,
+                Email = s.User?.Email ?? string.Empty,
+                AddedByName = s.AddedByUser?.DisplayName ?? s.AddedByUser?.Email ?? s.AddedByUser?.UserName ?? s.AddedByUserId,
+                CreatedAtUtc = s.CreatedAtUtc
+            })
+            .ToList();
+    }
+
+    public sealed class AddSubscriberRequest
+    {
+        public string UserId { get; set; } = string.Empty;
     }
 }

@@ -45,4 +45,7 @@ public class Ticket
     public ICollection<TicketComment> Comments { get; set; } = new List<TicketComment>();
     public ICollection<TicketInternalNote> InternalNotes { get; set; } = new List<TicketInternalNote>();
     public ICollection<TicketAttachment> Attachments { get; set; } = new List<TicketAttachment>();
+    public ICollection<TicketSubscriber> Subscribers { get; set; } = new List<TicketSubscriber>();
+    public ICollection<TicketEvent> Events { get; set; } = new List<TicketEvent>();
+    public ICollection<TicketTimeEntry> TimeEntries { get; set; } = new List<TicketTimeEntry>();
 }
